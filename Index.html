@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lembrete de Lançamento | Dashboard</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    
+    <style>
+        body { background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .navbar { background-color: #2c3e50; padding: 15px 0; border-bottom: 3px solid #3498db; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s; }
+        .card:hover { transform: translateY(-5px); }
+        .card-resumo { color: white; padding: 20px; }
+        .filter-section { background: #fff; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e0e0e0; }
+        .filter-title { font-size: 0.85rem; font-weight: bold; color: #7f8c8d; text-transform: uppercase; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .scroll-filter { max-height: 150px; overflow-y: auto; padding-right: 5px; }
+        .select-all-link { font-size: 0.75rem; text-decoration: none; color: #3498db; cursor: pointer; font-weight: bold; }
+        .competencia-badge { background-color: #d1d8e0; color: #2d3436; font-weight: bold; padding: 5px 10px; border-radius: 6px; }
+        .btn-status { min-width: 120px; font-size: 0.85rem; font-weight: 600; border-radius: 8px; }
+        .text-start { text-align: left !important; }
+        #saudacao { font-size: 0.9rem; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark mb-4 shadow-sm">
+    <div class="container-fluid px-4 d-flex justify-content-between align-items-center">
+        <div>
+            <span class="navbar-brand fw-bold m-0"><i class="fas fa-rocket me-2"></i> Lembrete de Lançamento</span>
+            <div id="saudacao" class="text-white-50">Carregando saudação...</div>
+        </div>
+        <div class="text-white text-end">
+            <small class="d-block opacity-75">Data de Hoje</small>
+            <strong id="dataAtual">--/--/----</strong>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-4">
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card card-resumo bg-primary shadow-sm">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="opacity-75 mb-1">Total de Lançamentos</h6>
+                        <h2 id="countTotal" class="mb-0 fw-bold">0</h2>
+                    </div>
+                    <i class="fas fa-list-ul fa-2x opacity-25"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card card-resumo bg-warning text-dark shadow-sm">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="opacity-75 mb-1">Aguardando (Pendentes)</h6>
+                        <h2 id="countPendente" class="mb-0 fw-bold">0</h2>
+                    </div>
+                    <i class="fas fa-clock fa-2x opacity-25"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card card-resumo bg-success shadow-sm">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="opacity-75 mb-1">Concluídos com Sucesso</h6>
+                        <h2 id="countConcluido" class="mb-0 fw-bold">0</h2>
+                    </div>
+                    <i class="fas fa-check-double fa-2x opacity-25"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row text-start">
+        <div class="col-lg-3">
+            <div class="card p-3 mb-4 shadow-sm">
+                <h6 class="fw-bold mb-3 text-primary"><i class="fas fa-file-excel me-2"></i>Nova Importação</h6>
+                <input type="file" id="inputExcel" class="form-control form-control-sm mb-3" accept=".xlsx, .xls">
+                <button class="btn btn-primary btn-sm w-100 fw-bold" onclick="processarExcel()">Visualizar e Adicionar</button>
+            </div>
+
+            <div class="filter-section shadow-sm">
+                <div class="filter-title">Competência <span class="select-all-link" onclick="toggleAll('filter-periodo')">Inverter</span></div>
+                <div id="filter-periodo" class="scroll-filter mb-3"><p class="text-muted small">Aguardando...</p></div>
+
+                <hr>
+
+                <div class="filter-title">Responsável <span class="select-all-link" onclick="toggleAll('filter-responsaveis')">Inverter</span></div>
+                <div id="filter-responsaveis" class="scroll-filter mb-3"><p class="text-muted small">Aguardando...</p></div>
+
+                <hr>
+
+                <div class="filter-title">Status Atual</div>
+                <div id="filter-status" class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input filter-check" type="checkbox" value="Pendente" id="status-Pendente" checked>
+                        <label class="form-check-label" for="status-Pendente">Pendente</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input filter-check" type="checkbox" value="Concluído" id="status-Concluido" checked>
+                        <label class="form-check-label" for="status-Concluido">Concluído</label>
+                    </div>
+                </div>
+
+                <button class="btn btn-outline-danger btn-sm w-100 mt-2 opacity-75" onclick="limparHistoricoBanco()">
+                    <i class="fas fa-trash-alt me-2"></i>Limpar Tudo
+                </button>
+            </div>
+
+            <button class="btn btn-success w-100 shadow py-3 fw-bold" id="btnSalvar" style="display:none;" onclick="enviarParaSupabase()">
+                <i class="fas fa-cloud-upload-alt me-2"></i>Sincronizar no Banco
+            </button>
+        </div>
+
+        <div class="col-lg-9">
+            <div class="card p-4 shadow-sm">
+                <div id="tabelaContainer">
+                    <div class="text-center py-5 text-muted">
+                        <i class="fas fa-database fa-3x mb-3 opacity-25"></i>
+                        <p>Nenhum dado encontrado no histórico.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+    const _URL = 'https://yqfswykeybzaaysoygjd.supabase.co'; 
+    const _KEY = 'sb_publishable_d8gxS1nSdVtwxHgcmmxT1g_Jarm23Nj';
+    const supabaseClient = supabase.createClient(_URL, _KEY);
+
+    let table;
+    let dadosAcumulados = [];
+
+    // --- LOGICA DE SAUDAÇÃO E DATA ---
+    function iniciarDashboard() {
+        const agora = new Date();
+        const hora = agora.getHours();
+        const saudacaoEl = document.getElementById('saudacao');
+        const dataEl = document.getElementById('dataAtual');
+        
+        let msg = "";
+        if (hora >= 5 && hora < 12) msg = "Bom dia ☀️";
+        else if (hora >= 12 && hora < 18) msg = "Boa tarde ☕";
+        else msg = "Boa noite 🌙";
+
+        saudacaoEl.innerText = msg + " Pronto para organizar os lançamentos?";
+        dataEl.innerText = agora.toLocaleDateString('pt-BR');
+        
+        carregarDadosBanco();
+    }
+
+    function atualizarCards() {
+        const total = dadosAcumulados.length;
+        const pendentes = dadosAcumulados.filter(d => (d.status || d.Status || "").toLowerCase() === 'pendente').length;
+        const concluidos = dadosAcumulados.filter(d => (d.status || d.Status || "").toLowerCase() === 'concluído').length;
+
+        document.getElementById('countTotal').innerText = total;
+        document.getElementById('countPendente').innerText = pendentes;
+        document.getElementById('countConcluido').innerText = concluidos;
+    }
+
+    function serialParaData(serial) {
+        if (!serial || isNaN(serial)) return serial;
+        return new Date(Math.round((serial - 25569) * 86400 * 1000));
+    }
+
+    async function carregarDadosBanco() {
+        const { data, error } = await supabaseClient.from('lancamentos').select('*');
+        if (data && data.length > 0) {
+            dadosAcumulados = data;
+            exibirTabela(dadosAcumulados);
+            gerarChecklistFiltros(dadosAcumulados);
+            atualizarCards();
+        }
+    }
+
+    function processarExcel() {
+        const input = document.getElementById('inputExcel');
+        if (!input.files[0]) return alert("Selecione o arquivo.");
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+            
+            const novosDados = json.map(item => ({
+                id: Date.now() + Math.random(), 
+                convenio: item.Convênio || item.convenio,
+                responsavel: item.Responsavel || item.responsavel,
+                sistema: item.Sistema || item.sistema,
+                data_corte: item['Data de Corte'] || item.data_corte,
+                status: 'Pendente'
+            }));
+
+            dadosAcumulados = [...dadosAcumulados, ...novosDados];
+            exibirTabela(dadosAcumulados);
+            gerarChecklistFiltros(dadosAcumulados);
+            atualizarCards();
+            document.getElementById('btnSalvar').style.display = 'block';
+        };
+        reader.readAsArrayBuffer(input.files[0]);
+    }
+
+    function gerarChecklistFiltros(dados) {
+        const resps = [...new Set(dados.map(item => item.responsavel || item.Responsavel))].filter(Boolean).sort();
+        document.getElementById('filter-responsaveis').innerHTML = resps.map(r => 
+            `<div class="form-check"><input class="form-check-input filter-check" type="checkbox" value="${r}" checked><label class="form-check-label small">${r}</label></div>`
+        ).join('');
+
+        const comps = [...new Set(dados.map(item => {
+            if (item.competencia) return item.competencia;
+            let d = item.data_corte || item['Data de Corte'];
+            if (typeof d === 'number') d = serialParaData(d);
+            const dataObj = new Date(d);
+            return isNaN(dataObj.getTime()) ? null : dataObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+        }))].filter(Boolean).sort((a, b) => b.localeCompare(a));
+        
+        document.getElementById('filter-periodo').innerHTML = comps.map(c => 
+            `<div class="form-check"><input class="form-check-input filter-check-comp" type="checkbox" value="${c}" checked><label class="form-check-label small">${c}</label></div>`
+        ).join('');
+
+        $('.filter-check, .filter-check-comp').on('change', () => table.draw());
+    }
+
+    function toggleAll(containerId) {
+        $(`#${containerId} input`).each(function() { this.checked = !this.checked; });
+        table.draw();
+    }
+
+    function exibirTabela(dados) {
+        if ($.fn.DataTable.isDataTable('#tabelaLancamentos')) $('#tabelaLancamentos').DataTable().destroy();
+
+        let html = `<table id="tabelaLancamentos" class="table table-hover w-100 align-middle">
+            <thead class="table-light"><tr><th>Convênio</th><th>Competência</th><th>Responsável</th><th>Corte</th><th class="text-center">Ação</th></tr></thead>
+            <tbody>`;
+        
+        dados.forEach(item => {
+            let d = item.data_corte || item['Data de Corte'];
+            if (typeof d === 'number') d = serialParaData(d);
+            const dObj = new Date(d);
+            const formatada = isNaN(dObj.getTime()) ? d : dObj.toLocaleDateString('pt-BR');
+            const comp = item.competencia || (isNaN(dObj.getTime()) ? '' : dObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }));
+
+            const statusAtual = item.status || item.Status || 'Pendente';
+            const isConcluido = statusAtual.toLowerCase() === 'concluído';
+
+            html += `<tr>
+                <td><small class="fw-bold text-dark">${item.convenio || item.Convênio || ''}</small></td>
+                <td><span class="badge competencia-badge">${comp}</span></td>
+                <td><span class="small text-muted">${item.responsavel || item.Responsavel || ''}</span></td>
+                <td><span class="small">${formatada}</span></td>
+                <td class="text-center">
+                    <button class="btn ${isConcluido ? 'btn-success' : 'btn-outline-secondary'} btn-sm btn-status w-100 shadow-sm" onclick="toggleStatus('${item.id}', '${statusAtual}')">
+                        <i class="fas ${isConcluido ? 'fa-check-circle' : 'fa-circle'} me-1"></i> ${statusAtual}
+                    </button>
+                </td>
+            </tr>`;
+        });
+        
+        document.getElementById('tabelaContainer').innerHTML = html + '</tbody></table>';
+
+        table = $('#tabelaLancamentos').DataTable({
+            language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
+            dom: 'rtip', pageLength: 25, order: [[1, 'desc']]
+        });
+
+        $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+            const rSel = $('#filter-responsaveis input:checked').map(function() { return $(this).val(); }).get();
+            const cSel = $('#filter-periodo input:checked').map(function() { return $(this).val(); }).get();
+            const sSel = $('#filter-status input:checked').map(function() { return $(this).val(); }).get();
+            const statLinha = $(table.cell(dataIndex, 4).node()).text().trim();
+            return rSel.includes(data[2]) && cSel.includes(data[1]) && sSel.includes(statLinha);
+        });
+    }
+
+    async function toggleStatus(id, statusAtual) {
+        const novoStatus = statusAtual === 'Concluído' ? 'Pendente' : 'Concluído';
+        if (!String(id).includes('.')) {
+            const { error } = await supabaseClient.from('lancamentos').update({ status: novoStatus }).eq('id', id);
+            if (error) return alert("Erro no banco!");
+        }
+        const idx = dadosAcumulados.findIndex(d => String(d.id) === String(id));
+        if (idx !== -1) {
+            dadosAcumulados[idx].status = novoStatus;
+            dadosAcumulados[idx].Status = novoStatus;
+            exibirTabela(dadosAcumulados);
+            atualizarCards();
+        }
+    }
+
+    async function enviarParaSupabase() {
+        const novos = dadosAcumulados.filter(item => {
+            const r = String(item.responsavel || item.Responsavel || "").toLowerCase();
+            return String(item.id).includes('.') && r !== 'não lança' && r !== 'nao lanca';
+        }).map(item => {
+            let d = item.data_corte || item['Data de Corte'];
+            if (typeof d === 'number') d = serialParaData(d);
+            const dObj = new Date(d);
+            if (isNaN(dObj.getTime())) return null;
+            return {
+                convenio: item.convenio || item.Convênio,
+                responsavel: item.responsavel || item.Responsavel,
+                sistema: item.sistema || item.Sistema,
+                data_corte: dObj.toISOString().split('T')[0],
+                competencia: dObj.toLocaleDateString('pt-BR', {month:'2-digit', year:'numeric'}),
+                status: 'Pendente'
+            };
+        }).filter(item => item !== null);
+
+        if (novos.length === 0) return alert("Nenhum dado novo!");
+        const { error } = await supabaseClient.from('lancamentos').insert(novos);
+        if (error) alert("Erro: " + error.message); 
+        else { alert("Sincronizado!"); location.reload(); }
+    }
+
+    async function limparHistoricoBanco() {
+        if (confirm("Deseja apagar TODO o histórico?")) {
+            const { error } = await supabaseClient.from('lancamentos').delete().neq('id', 0); 
+            if (error) alert("Erro ao limpar!"); else location.reload();
+        }
+    }
+
+    // Inicia tudo
+    iniciarDashboard();
+</script>
+</body>
+</html>
