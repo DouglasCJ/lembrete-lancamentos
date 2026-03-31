@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lembrete de Lançamento | Dashboard</title>
+    <title>Lembrete de Lançamento | Dashboard AKRK</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -194,10 +194,11 @@
             
             const novosDados = json.map(item => ({
                 id: Date.now() + Math.random(), 
-                convenio: item.Convênio || item.convenio,
-                responsavel: item.Responsavel || item.responsavel,
-                sistema: item.Sistema || item.sistema,
+                convenio: item['Convênio'] || item.convenio || item.Convênio,
+                responsavel: item['Responsável'] || item.responsavel || item.Responsavel,
+                sistema: item['Sistema'] || item.sistema || item.Sistema,
                 data_corte: item['Data de Corte'] || item.data_corte,
+                data_lancamento: item['Data de Lançamento'] || item.data_lancamento,
                 status: 'Pendente'
             }));
 
@@ -247,7 +248,6 @@
             let d = item.data_corte;
             if (typeof d === 'number') d = serialParaData(d);
             const dObj = new Date(d);
-            // Ajuste crítico: usando UTC para exibir a data exata da planilha
             const formatada = isNaN(dObj.getTime()) ? d : dObj.toLocaleDateString('pt-BR', {timeZone: 'UTC'});
             const comp = item.competencia || (isNaN(dObj.getTime()) ? '' : dObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric', timeZone: 'UTC' }));
             const statusAtual = item.status || 'Pendente';
@@ -296,36 +296,79 @@
     }
 
     async function enviarParaSupabase() {
-        const novos = dadosAcumulados.filter(item => {
+        const novosVindoDoExcel = dadosAcumulados.filter(item => {
             const r = String(item.responsavel || "").toLowerCase();
             return String(item.id).includes('.') && r !== 'não lança' && r !== 'nao lanca';
-        }).map(item => {
-            let d = item.data_corte;
-            if (typeof d === 'number') d = serialParaData(d);
-            const dObj = new Date(d);
-            if (isNaN(dObj.getTime())) return null;
+        });
 
-            // AJUSTE FINAL: Envia apenas a data YYYY-MM-DD para o banco
-            const dataLimpa = dObj.toISOString().split('T')[0];
+        if (novosVindoDoExcel.length === 0) return alert("Nenhum dado novo para processar!");
 
-            return {
+        let contAtualizados = 0;
+        let contInseridos = 0;
+
+        for (const item of novosVindoDoExcel) {
+            let dCorte = item.data_corte;
+            if (typeof dCorte === 'number') dCorte = serialParaData(dCorte);
+            const corteObj = new Date(dCorte);
+            if (isNaN(corteObj.getTime())) continue;
+
+            const corteLimpa = corteObj.toISOString().split('T')[0];
+            const competenciaCalculada = corteObj.toLocaleDateString('pt-BR', {month:'2-digit', year:'numeric', timeZone: 'UTC'});
+
+            let dLanc = item.data_lancamento;
+            if (typeof dLanc === 'number') dLanc = serialParaData(dLanc);
+            const lancObj = new Date(dLanc);
+            const lancLimpa = isNaN(lancObj.getTime()) ? corteLimpa : lancObj.toISOString().split('T')[0];
+
+            // 1. BUSCA: Verifica se este CONVÊNIO já existe no banco
+            const { data: existente } = await supabaseClient
+                .from('lancamentos')
+                .select('id, competencia')
+                .eq('convenio', item.convenio)
+                .maybeSingle();
+
+            if (existente) {
+                // 2. LÓGICA DE SUBSTITUIÇÃO: Se a competência mudou, atualiza e RESETA STATUS
+                if (existente.competencia !== competenciaCalculada) {
+                    const { error } = await supabaseClient
+                        .from('lancamentos')
+                        .update({
+                            competencia: competenciaCalculada,
+                            data_corte: corteLimpa,
+                            data_lancamento: lancLimpa,
+                            responsavel: item.responsavel,
+                            sistema: item.sistema,
+                            status: 'Pendente' // Reset crucial aqui
+                        })
+                        .eq('id', existente.id);
+                    
+                    if (!error) contAtualizados++;
+                }
+                // Se a competência for a mesma, ele ignora para preservar o status atual
+                continue; 
+            }
+
+            // 3. Se o convênio não existir, insere como novo
+            const objetoParaSalvar = {
                 convenio: item.convenio,
                 responsavel: item.responsavel,
                 sistema: item.sistema,
-                data_corte: dataLimpa, 
-                competencia: dObj.toLocaleDateString('pt-BR', {month:'2-digit', year:'numeric', timeZone: 'UTC'}),
+                data_corte: corteLimpa, 
+                data_lancamento: lancLimpa,
+                competencia: competenciaCalculada,
                 status: 'Pendente'
             };
-        }).filter(item => item !== null);
 
-        if (novos.length === 0) return alert("Nenhum dado novo!");
-        const { error } = await supabaseClient.from('lancamentos').insert(novos);
-        if (error) alert("Erro: " + error.message); 
-        else { alert("Sincronizado!"); location.reload(); }
+            const { error } = await supabaseClient.from('lancamentos').insert(objetoParaSalvar);
+            if (!error) contInseridos++;
+        }
+
+        alert(`Sincronização concluída!\n- Convênios atualizados para nova competência: ${contAtualizados}\n- Novos convênios adicionados: ${contInseridos}`);
+        location.reload();
     }
 
     async function limparHistoricoBanco() {
-        if (confirm("Deseja apagar TODO o histórico?")) {
+        if (confirm("Deseja apagar TODO o histórico? Isso apagará todos os dados de todas as competências.")) {
             const { error } = await supabaseClient.from('lancamentos').delete().neq('id', 0); 
             if (error) alert("Erro ao limpar!"); else location.reload();
         }
