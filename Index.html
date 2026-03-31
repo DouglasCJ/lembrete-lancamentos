@@ -145,18 +145,13 @@
     let table;
     let dadosAcumulados = [];
 
-    // --- LOGICA DE SAUDAÇÃO E DATA ---
     function iniciarDashboard() {
         const agora = new Date();
         const hora = agora.getHours();
         const saudacaoEl = document.getElementById('saudacao');
         const dataEl = document.getElementById('dataAtual');
         
-        let msg = "";
-        if (hora >= 5 && hora < 12) msg = "Bom dia ☀️";
-        else if (hora >= 12 && hora < 18) msg = "Boa tarde ☕";
-        else msg = "Boa noite 🌙";
-
+        let msg = (hora >= 5 && hora < 12) ? "Bom dia ☀️" : (hora >= 12 && hora < 18) ? "Boa tarde ☕" : "Boa noite 🌙";
         saudacaoEl.innerText = msg + " Pronto para organizar os lançamentos?";
         dataEl.innerText = agora.toLocaleDateString('pt-BR');
         
@@ -165,9 +160,8 @@
 
     function atualizarCards() {
         const total = dadosAcumulados.length;
-        const pendentes = dadosAcumulados.filter(d => (d.status || d.Status || "").toLowerCase() === 'pendente').length;
-        const concluidos = dadosAcumulados.filter(d => (d.status || d.Status || "").toLowerCase() === 'concluído').length;
-
+        const pendentes = dadosAcumulados.filter(d => (d.status || "").toLowerCase() === 'pendente').length;
+        const concluidos = dadosAcumulados.filter(d => (d.status || "").toLowerCase() === 'concluído').length;
         document.getElementById('countTotal').innerText = total;
         document.getElementById('countPendente').innerText = pendentes;
         document.getElementById('countConcluido').innerText = concluidos;
@@ -180,7 +174,7 @@
 
     async function carregarDadosBanco() {
         const { data, error } = await supabaseClient.from('lancamentos').select('*');
-        if (data && data.length > 0) {
+        if (data) {
             dadosAcumulados = data;
             exibirTabela(dadosAcumulados);
             gerarChecklistFiltros(dadosAcumulados);
@@ -217,17 +211,17 @@
     }
 
     function gerarChecklistFiltros(dados) {
-        const resps = [...new Set(dados.map(item => item.responsavel || item.Responsavel))].filter(Boolean).sort();
+        const resps = [...new Set(dados.map(item => item.responsavel))].filter(Boolean).sort();
         document.getElementById('filter-responsaveis').innerHTML = resps.map(r => 
             `<div class="form-check"><input class="form-check-input filter-check" type="checkbox" value="${r}" checked><label class="form-check-label small">${r}</label></div>`
         ).join('');
 
         const comps = [...new Set(dados.map(item => {
             if (item.competencia) return item.competencia;
-            let d = item.data_corte || item['Data de Corte'];
+            let d = item.data_corte;
             if (typeof d === 'number') d = serialParaData(d);
-            const dataObj = new Date(d);
-            return isNaN(dataObj.getTime()) ? null : dataObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
+            const dObj = new Date(d);
+            return isNaN(dObj.getTime()) ? null : dObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric', timeZone: 'UTC' });
         }))].filter(Boolean).sort((a, b) => b.localeCompare(a));
         
         document.getElementById('filter-periodo').innerHTML = comps.map(c => 
@@ -250,22 +244,22 @@
             <tbody>`;
         
         dados.forEach(item => {
-            let d = item.data_corte || item['Data de Corte'];
+            let d = item.data_corte;
             if (typeof d === 'number') d = serialParaData(d);
             const dObj = new Date(d);
-            const formatada = isNaN(dObj.getTime()) ? d : dObj.toLocaleDateString('pt-BR');
-            const comp = item.competencia || (isNaN(dObj.getTime()) ? '' : dObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }));
-
-            const statusAtual = item.status || item.Status || 'Pendente';
-            const isConcluido = statusAtual.toLowerCase() === 'concluído';
+            // Ajuste crítico: usando UTC para exibir a data exata da planilha
+            const formatada = isNaN(dObj.getTime()) ? d : dObj.toLocaleDateString('pt-BR', {timeZone: 'UTC'});
+            const comp = item.competencia || (isNaN(dObj.getTime()) ? '' : dObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric', timeZone: 'UTC' }));
+            const statusAtual = item.status || 'Pendente';
+            const isConcluido = statusAtual === 'Concluído';
 
             html += `<tr>
-                <td><small class="fw-bold text-dark">${item.convenio || item.Convênio || ''}</small></td>
+                <td><small class="fw-bold text-dark">${item.convenio || ''}</small></td>
                 <td><span class="badge competencia-badge">${comp}</span></td>
-                <td><span class="small text-muted">${item.responsavel || item.Responsavel || ''}</span></td>
+                <td><span class="small text-muted">${item.responsavel || ''}</span></td>
                 <td><span class="small">${formatada}</span></td>
                 <td class="text-center">
-                    <button class="btn ${isConcluido ? 'btn-success' : 'btn-outline-secondary'} btn-sm btn-status w-100 shadow-sm" onclick="toggleStatus('${item.id}', '${statusAtual}')">
+                    <button class="btn ${isConcluido ? 'btn-success' : 'btn-outline-secondary'} btn-sm btn-status w-100" onclick="toggleStatus('${item.id}', '${statusAtual}')">
                         <i class="fas ${isConcluido ? 'fa-check-circle' : 'fa-circle'} me-1"></i> ${statusAtual}
                     </button>
                 </td>
@@ -273,7 +267,6 @@
         });
         
         document.getElementById('tabelaContainer').innerHTML = html + '</tbody></table>';
-
         table = $('#tabelaLancamentos').DataTable({
             language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
             dom: 'rtip', pageLength: 25, order: [[1, 'desc']]
@@ -297,7 +290,6 @@
         const idx = dadosAcumulados.findIndex(d => String(d.id) === String(id));
         if (idx !== -1) {
             dadosAcumulados[idx].status = novoStatus;
-            dadosAcumulados[idx].Status = novoStatus;
             exibirTabela(dadosAcumulados);
             atualizarCards();
         }
@@ -305,19 +297,23 @@
 
     async function enviarParaSupabase() {
         const novos = dadosAcumulados.filter(item => {
-            const r = String(item.responsavel || item.Responsavel || "").toLowerCase();
+            const r = String(item.responsavel || "").toLowerCase();
             return String(item.id).includes('.') && r !== 'não lança' && r !== 'nao lanca';
         }).map(item => {
-            let d = item.data_corte || item['Data de Corte'];
+            let d = item.data_corte;
             if (typeof d === 'number') d = serialParaData(d);
             const dObj = new Date(d);
             if (isNaN(dObj.getTime())) return null;
+
+            // AJUSTE FINAL: Envia apenas a data YYYY-MM-DD para o banco
+            const dataLimpa = dObj.toISOString().split('T')[0];
+
             return {
-                convenio: item.convenio || item.Convênio,
-                responsavel: item.responsavel || item.Responsavel,
-                sistema: item.sistema || item.Sistema,
-                data_corte: dObj.toISOString().split('T')[0],
-                competencia: dObj.toLocaleDateString('pt-BR', {month:'2-digit', year:'numeric'}),
+                convenio: item.convenio,
+                responsavel: item.responsavel,
+                sistema: item.sistema,
+                data_corte: dataLimpa, 
+                competencia: dObj.toLocaleDateString('pt-BR', {month:'2-digit', year:'numeric', timeZone: 'UTC'}),
                 status: 'Pendente'
             };
         }).filter(item => item !== null);
@@ -335,7 +331,6 @@
         }
     }
 
-    // Inicia tudo
     iniciarDashboard();
 </script>
 </body>
