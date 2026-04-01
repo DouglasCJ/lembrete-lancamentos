@@ -21,7 +21,6 @@
         .select-all-link { font-size: 0.75rem; text-decoration: none; color: #3498db; cursor: pointer; font-weight: bold; }
         .competencia-badge { background-color: #d1d8e0; color: #2d3436; font-weight: bold; padding: 5px 10px; border-radius: 6px; }
         .btn-status { min-width: 120px; font-size: 0.85rem; font-weight: 600; border-radius: 8px; }
-        .text-start { text-align: left !important; }
         #saudacao { font-size: 0.9rem; margin-top: 5px; }
     </style>
 </head>
@@ -77,7 +76,7 @@
         </div>
     </div>
 
-    <div class="row text-start">
+    <div class="row">
         <div class="col-lg-3">
             <div class="card p-3 mb-4 shadow-sm">
                 <h6 class="fw-bold mb-3 text-primary"><i class="fas fa-file-excel me-2"></i>Nova Importação</h6>
@@ -88,14 +87,10 @@
             <div class="filter-section shadow-sm">
                 <div class="filter-title">Competência <span class="select-all-link" onclick="toggleAll('filter-periodo')">Inverter</span></div>
                 <div id="filter-periodo" class="scroll-filter mb-3"><p class="text-muted small">Aguardando...</p></div>
-
                 <hr>
-
                 <div class="filter-title">Responsável <span class="select-all-link" onclick="toggleAll('filter-responsaveis')">Inverter</span></div>
                 <div id="filter-responsaveis" class="scroll-filter mb-3"><p class="text-muted small">Aguardando...</p></div>
-
                 <hr>
-
                 <div class="filter-title">Status Atual</div>
                 <div id="filter-status" class="mb-3">
                     <div class="form-check">
@@ -107,7 +102,6 @@
                         <label class="form-check-label" for="status-Concluido">Concluído</label>
                     </div>
                 </div>
-
                 <button class="btn btn-outline-danger btn-sm w-100 mt-2 opacity-75" onclick="limparHistoricoBanco()">
                     <i class="fas fa-trash-alt me-2"></i>Limpar Tudo
                 </button>
@@ -145,31 +139,44 @@
     let table;
     let dadosAcumulados = [];
 
+    // --- 1. AJUSTE DE DATA BR ---
+    function converterDataBR(valor) {
+        if (!valor) return new Date();
+        
+        // Se for número (serial do Excel)
+        if (typeof valor === 'number') {
+            return new Date(Math.round((valor - 25569) * 86400 * 1000));
+        }
+        
+        // Se for string "08/04/2026"
+        if (typeof valor === 'string' && valor.includes('/')) {
+            const [d, m, y] = valor.split('/');
+            return new Date(parseInt(y), parseInt(m) - 1, parseInt(d), 12, 0, 0);
+        }
+        
+        return new Date(valor);
+    }
+
+    function calcularCompetenciaAKRK(nomeConvenio, dataRaw) {
+        const dObj = converterDataBR(dataRaw);
+        let mes = dObj.getMonth() + 1;
+        let ano = dObj.getFullYear();
+        const dia = dObj.getDate();
+
+        const especiais = ["PREF. PINDARÉ-MIRIM", "PREF. ITAPECURU-MIRIM"];
+
+        if (especiais.includes(String(nomeConvenio).toUpperCase()) || dia > 20) {
+            mes++;
+            if (mes > 12) { mes = 1; ano++; }
+        }
+        return `${String(mes).padStart(2, '0')}/${ano}`;
+    }
+
     function iniciarDashboard() {
         const agora = new Date();
-        const hora = agora.getHours();
-        const saudacaoEl = document.getElementById('saudacao');
-        const dataEl = document.getElementById('dataAtual');
-        
-        let msg = (hora >= 5 && hora < 12) ? "Bom dia ☀️" : (hora >= 12 && hora < 18) ? "Boa tarde ☕" : "Boa noite 🌙";
-        saudacaoEl.innerText = msg + " Pronto para organizar os lançamentos?";
-        dataEl.innerText = agora.toLocaleDateString('pt-BR');
-        
+        document.getElementById('saudacao').innerText = "Grupo AKRK | Painel de Controle";
+        document.getElementById('dataAtual').innerText = agora.toLocaleDateString('pt-BR');
         carregarDadosBanco();
-    }
-
-    function atualizarCards() {
-        const total = dadosAcumulados.length;
-        const pendentes = dadosAcumulados.filter(d => (d.status || "").toLowerCase() === 'pendente').length;
-        const concluidos = dadosAcumulados.filter(d => (d.status || "").toLowerCase() === 'concluído').length;
-        document.getElementById('countTotal').innerText = total;
-        document.getElementById('countPendente').innerText = pendentes;
-        document.getElementById('countConcluido').innerText = concluidos;
-    }
-
-    function serialParaData(serial) {
-        if (!serial || isNaN(serial)) return serial;
-        return new Date(Math.round((serial - 25569) * 86400 * 1000));
     }
 
     async function carregarDadosBanco() {
@@ -192,15 +199,21 @@
             const workbook = XLSX.read(data, {type: 'array'});
             const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
             
-            const novosDados = json.map(item => ({
-                id: Date.now() + Math.random(), 
-                convenio: item['Convênio'] || item.convenio || item.Convênio,
-                responsavel: item['Responsável'] || item.responsavel || item.Responsavel,
-                sistema: item['Sistema'] || item.sistema || item.Sistema,
-                data_corte: item['Data de Corte'] || item.data_corte,
-                data_lancamento: item['Data de Lançamento'] || item.data_lancamento,
-                status: 'Pendente'
-            }));
+            const novosDados = json.map(item => {
+                const conv = item['Convênio'] || item.convenio || item.Convênio;
+                const dCorteRaw = item['Data de Corte'] || item.data_corte;
+                const dCorteObj = converterDataBR(dCorteRaw);
+
+                return {
+                    id: Date.now() + Math.random(), 
+                    convenio: conv,
+                    responsavel: item['Responsável'] || item.responsavel || item.Responsavel,
+                    sistema: item['Sistema'] || item.sistema || item.Sistema,
+                    data_corte: dCorteObj.toISOString().split('T')[0],
+                    competencia: calcularCompetenciaAKRK(conv, dCorteRaw),
+                    status: 'Pendente'
+                };
+            });
 
             dadosAcumulados = [...dadosAcumulados, ...novosDados];
             exibirTabela(dadosAcumulados);
@@ -211,32 +224,6 @@
         reader.readAsArrayBuffer(input.files[0]);
     }
 
-    function gerarChecklistFiltros(dados) {
-        const resps = [...new Set(dados.map(item => item.responsavel))].filter(Boolean).sort();
-        document.getElementById('filter-responsaveis').innerHTML = resps.map(r => 
-            `<div class="form-check"><input class="form-check-input filter-check" type="checkbox" value="${r}" checked><label class="form-check-label small">${r}</label></div>`
-        ).join('');
-
-        const comps = [...new Set(dados.map(item => {
-            if (item.competencia) return item.competencia;
-            let d = item.data_corte;
-            if (typeof d === 'number') d = serialParaData(d);
-            const dObj = new Date(d);
-            return isNaN(dObj.getTime()) ? null : dObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric', timeZone: 'UTC' });
-        }))].filter(Boolean).sort((a, b) => b.localeCompare(a));
-        
-        document.getElementById('filter-periodo').innerHTML = comps.map(c => 
-            `<div class="form-check"><input class="form-check-input filter-check-comp" type="checkbox" value="${c}" checked><label class="form-check-label small">${c}</label></div>`
-        ).join('');
-
-        $('.filter-check, .filter-check-comp').on('change', () => table.draw());
-    }
-
-    function toggleAll(containerId) {
-        $(`#${containerId} input`).each(function() { this.checked = !this.checked; });
-        table.draw();
-    }
-
     function exibirTabela(dados) {
         if ($.fn.DataTable.isDataTable('#tabelaLancamentos')) $('#tabelaLancamentos').DataTable().destroy();
 
@@ -245,22 +232,17 @@
             <tbody>`;
         
         dados.forEach(item => {
-            let d = item.data_corte;
-            if (typeof d === 'number') d = serialParaData(d);
-            const dObj = new Date(d);
-            const formatada = isNaN(dObj.getTime()) ? d : dObj.toLocaleDateString('pt-BR', {timeZone: 'UTC'});
-            const comp = item.competencia || (isNaN(dObj.getTime()) ? '' : dObj.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric', timeZone: 'UTC' }));
-            const statusAtual = item.status || 'Pendente';
-            const isConcluido = statusAtual === 'Concluído';
+            const status = item.status || 'Pendente';
+            const dExibicao = new Date(item.data_corte + 'T12:00:00').toLocaleDateString('pt-BR');
 
             html += `<tr>
-                <td><small class="fw-bold text-dark">${item.convenio || ''}</small></td>
-                <td><span class="badge competencia-badge">${comp}</span></td>
+                <td><small class="fw-bold">${item.convenio || ''}</small></td>
+                <td><span class="badge competencia-badge">${item.competencia || ''}</span></td>
                 <td><span class="small text-muted">${item.responsavel || ''}</span></td>
-                <td><span class="small">${formatada}</span></td>
+                <td><span class="small">${dExibicao}</span></td>
                 <td class="text-center">
-                    <button class="btn ${isConcluido ? 'btn-success' : 'btn-outline-secondary'} btn-sm btn-status w-100" onclick="toggleStatus('${item.id}', '${statusAtual}')">
-                        <i class="fas ${isConcluido ? 'fa-check-circle' : 'fa-circle'} me-1"></i> ${statusAtual}
+                    <button class="btn ${status === 'Concluído' ? 'btn-success' : 'btn-outline-secondary'} btn-sm btn-status w-100" onclick="toggleStatus('${item.id}', '${status}')">
+                        ${status}
                     </button>
                 </td>
             </tr>`;
@@ -271,7 +253,58 @@
             language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json' },
             dom: 'rtip', pageLength: 25, order: [[1, 'desc']]
         });
+        configurarFiltros();
+    }
 
+    async function enviarParaSupabase() {
+        const novos = dadosAcumulados.filter(item => String(item.id).includes('.'));
+        for (const item of novos) {
+            const { data: ex } = await supabaseClient.from('lancamentos').select('id, competencia').eq('convenio', item.convenio).maybeSingle();
+            
+            const payload = {
+                convenio: item.convenio,
+                responsavel: item.responsavel,
+                sistema: item.sistema,
+                data_corte: item.data_corte,
+                competencia: item.competencia,
+                status: 'Pendente'
+            };
+
+            if (ex) {
+                if (ex.competencia !== item.competencia) {
+                    await supabaseClient.from('lancamentos').update(payload).eq('id', ex.id);
+                }
+            } else {
+                await supabaseClient.from('lancamentos').insert(payload);
+            }
+        }
+        alert("Sincronizado!");
+        location.reload();
+    }
+
+    async function toggleStatus(id, status) {
+        const novo = status === 'Concluído' ? 'Pendente' : 'Concluído';
+        if (!String(id).includes('.')) {
+            await supabaseClient.from('lancamentos').update({ status: novo }).eq('id', id);
+        }
+        location.reload();
+    }
+
+    function gerarChecklistFiltros(dados) {
+        const resps = [...new Set(dados.map(item => item.responsavel))].filter(Boolean).sort();
+        document.getElementById('filter-responsaveis').innerHTML = resps.map(r => 
+            `<div class="form-check"><input class="form-check-input filter-check" type="checkbox" value="${r}" checked><label class="form-check-label small">${r}</label></div>`
+        ).join('');
+
+        const comps = [...new Set(dados.map(item => item.competencia))].filter(Boolean).sort((a, b) => b.localeCompare(a));
+        document.getElementById('filter-periodo').innerHTML = comps.map(c => 
+            `<div class="form-check"><input class="form-check-input filter-check-comp" type="checkbox" value="${c}" checked><label class="form-check-label small">${c}</label></div>`
+        ).join('');
+
+        $('.filter-check, .filter-check-comp').on('change', () => table.draw());
+    }
+
+    function configurarFiltros() {
         $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
             const rSel = $('#filter-responsaveis input:checked').map(function() { return $(this).val(); }).get();
             const cSel = $('#filter-periodo input:checked').map(function() { return $(this).val(); }).get();
@@ -281,96 +314,24 @@
         });
     }
 
-    async function toggleStatus(id, statusAtual) {
-        const novoStatus = statusAtual === 'Concluído' ? 'Pendente' : 'Concluído';
-        if (!String(id).includes('.')) {
-            const { error } = await supabaseClient.from('lancamentos').update({ status: novoStatus }).eq('id', id);
-            if (error) return alert("Erro no banco!");
-        }
-        const idx = dadosAcumulados.findIndex(d => String(d.id) === String(id));
-        if (idx !== -1) {
-            dadosAcumulados[idx].status = novoStatus;
-            exibirTabela(dadosAcumulados);
-            atualizarCards();
-        }
+    function atualizarCards() {
+        const total = dadosAcumulados.length;
+        const pendentes = dadosAcumulados.filter(d => (d.status || "").toLowerCase() === 'pendente').length;
+        const concluidos = dadosAcumulados.filter(d => (d.status || "").toLowerCase() === 'concluído').length;
+        document.getElementById('countTotal').innerText = total;
+        document.getElementById('countPendente').innerText = pendentes;
+        document.getElementById('countConcluido').innerText = concluidos;
     }
 
-    async function enviarParaSupabase() {
-        const novosVindoDoExcel = dadosAcumulados.filter(item => {
-            const r = String(item.responsavel || "").toLowerCase();
-            return String(item.id).includes('.') && r !== 'não lança' && r !== 'nao lanca';
-        });
-
-        if (novosVindoDoExcel.length === 0) return alert("Nenhum dado novo para processar!");
-
-        let contAtualizados = 0;
-        let contInseridos = 0;
-
-        for (const item of novosVindoDoExcel) {
-            let dCorte = item.data_corte;
-            if (typeof dCorte === 'number') dCorte = serialParaData(dCorte);
-            const corteObj = new Date(dCorte);
-            if (isNaN(corteObj.getTime())) continue;
-
-            const corteLimpa = corteObj.toISOString().split('T')[0];
-            const competenciaCalculada = corteObj.toLocaleDateString('pt-BR', {month:'2-digit', year:'numeric', timeZone: 'UTC'});
-
-            let dLanc = item.data_lancamento;
-            if (typeof dLanc === 'number') dLanc = serialParaData(dLanc);
-            const lancObj = new Date(dLanc);
-            const lancLimpa = isNaN(lancObj.getTime()) ? corteLimpa : lancObj.toISOString().split('T')[0];
-
-            // 1. BUSCA: Verifica se este CONVÊNIO já existe no banco
-            const { data: existente } = await supabaseClient
-                .from('lancamentos')
-                .select('id, competencia')
-                .eq('convenio', item.convenio)
-                .maybeSingle();
-
-            if (existente) {
-                // 2. LÓGICA DE SUBSTITUIÇÃO: Se a competência mudou, atualiza e RESETA STATUS
-                if (existente.competencia !== competenciaCalculada) {
-                    const { error } = await supabaseClient
-                        .from('lancamentos')
-                        .update({
-                            competencia: competenciaCalculada,
-                            data_corte: corteLimpa,
-                            data_lancamento: lancLimpa,
-                            responsavel: item.responsavel,
-                            sistema: item.sistema,
-                            status: 'Pendente' // Reset crucial aqui
-                        })
-                        .eq('id', existente.id);
-                    
-                    if (!error) contAtualizados++;
-                }
-                // Se a competência for a mesma, ele ignora para preservar o status atual
-                continue; 
-            }
-
-            // 3. Se o convênio não existir, insere como novo
-            const objetoParaSalvar = {
-                convenio: item.convenio,
-                responsavel: item.responsavel,
-                sistema: item.sistema,
-                data_corte: corteLimpa, 
-                data_lancamento: lancLimpa,
-                competencia: competenciaCalculada,
-                status: 'Pendente'
-            };
-
-            const { error } = await supabaseClient.from('lancamentos').insert(objetoParaSalvar);
-            if (!error) contInseridos++;
-        }
-
-        alert(`Sincronização concluída!\n- Convênios atualizados para nova competência: ${contAtualizados}\n- Novos convênios adicionados: ${contInseridos}`);
-        location.reload();
+    function toggleAll(containerId) {
+        $(`#${containerId} input`).each(function() { this.checked = !this.checked; });
+        table.draw();
     }
 
     async function limparHistoricoBanco() {
-        if (confirm("Deseja apagar TODO o histórico? Isso apagará todos os dados de todas as competências.")) {
-            const { error } = await supabaseClient.from('lancamentos').delete().neq('id', 0); 
-            if (error) alert("Erro ao limpar!"); else location.reload();
+        if (confirm("Apagar tudo?")) {
+            await supabaseClient.from('lancamentos').delete().neq('id', 0);
+            location.reload();
         }
     }
 
