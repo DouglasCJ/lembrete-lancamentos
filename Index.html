@@ -30,7 +30,7 @@
     <div class="container-fluid px-4 d-flex justify-content-between align-items-center">
         <div>
             <span class="navbar-brand fw-bold m-0"><i class="fas fa-rocket me-2"></i> Lembrete de Lançamento</span>
-            <div id="saudacao" class="text-white-50">Carregando saudação...</div>
+            <div id="saudacao" class="text-white-50">Grupo AKRK | Dashboard Oficial</div>
         </div>
         <div class="text-white text-end">
             <small class="d-block opacity-75">Data de Hoje</small>
@@ -76,7 +76,7 @@
         </div>
     </div>
 
-    <div class="row">
+    <div class="row text-start">
         <div class="col-lg-3">
             <div class="card p-3 mb-4 shadow-sm">
                 <h6 class="fw-bold mb-3 text-primary"><i class="fas fa-file-excel me-2"></i>Nova Importação</h6>
@@ -139,22 +139,23 @@
     let table;
     let dadosAcumulados = [];
 
-    // --- 1. AJUSTE DE DATA BR ---
+    // --- 1. FUNÇÃO PARA CONVERTER DATA DE FORMA SEGURA (BR OU SERIAL) ---
     function converterDataBR(valor) {
-        if (!valor) return new Date();
+        if (!valor) return new Date(); // Se estiver null, assume HOJE
         
         // Se for número (serial do Excel)
         if (typeof valor === 'number') {
             return new Date(Math.round((valor - 25569) * 86400 * 1000));
         }
         
-        // Se for string "08/04/2026"
+        // Se for string no formato "08/04/2026"
         if (typeof valor === 'string' && valor.includes('/')) {
             const [d, m, y] = valor.split('/');
             return new Date(parseInt(y), parseInt(m) - 1, parseInt(d), 12, 0, 0);
         }
         
-        return new Date(valor);
+        const d = new Date(valor);
+        return isNaN(d.getTime()) ? new Date() : d;
     }
 
     function calcularCompetenciaAKRK(nomeConvenio, dataRaw) {
@@ -201,8 +202,14 @@
             
             const novosDados = json.map(item => {
                 const conv = item['Convênio'] || item.convenio || item.Convênio;
+                
+                // Trata Data de Corte
                 const dCorteRaw = item['Data de Corte'] || item.data_corte;
                 const dCorteObj = converterDataBR(dCorteRaw);
+
+                // Trata Data de Lançamento (Garante que nunca vá nula)
+                const dLancRaw = item['Data de Lançamento'] || item.data_lancamento;
+                const dLancObj = converterDataBR(dLancRaw);
 
                 return {
                     id: Date.now() + Math.random(), 
@@ -210,6 +217,7 @@
                     responsavel: item['Responsável'] || item.responsavel || item.Responsavel,
                     sistema: item['Sistema'] || item.sistema || item.Sistema,
                     data_corte: dCorteObj.toISOString().split('T')[0],
+                    data_lancamento: dLancObj.toISOString().split('T')[0],
                     competencia: calcularCompetenciaAKRK(conv, dCorteRaw),
                     status: 'Pendente'
                 };
@@ -222,6 +230,35 @@
             document.getElementById('btnSalvar').style.display = 'block';
         };
         reader.readAsArrayBuffer(input.files[0]);
+    }
+
+    async function enviarParaSupabase() {
+        const novos = dadosAcumulados.filter(item => String(item.id).includes('.'));
+        if (novos.length === 0) return alert("Nada novo para sincronizar.");
+
+        for (const item of novos) {
+            const { data: ex } = await supabaseClient.from('lancamentos').select('id, competencia').eq('convenio', item.convenio).maybeSingle();
+            
+            const payload = {
+                convenio: item.convenio,
+                responsavel: item.responsavel,
+                sistema: item.sistema,
+                data_corte: item.data_corte,
+                data_lancamento: item.data_lancamento, // CAMPO AGORA OBRIGATÓRIO
+                competencia: item.competencia,
+                status: 'Pendente'
+            };
+
+            if (ex) {
+                if (ex.competencia !== item.competencia) {
+                    await supabaseClient.from('lancamentos').update(payload).eq('id', ex.id);
+                }
+            } else {
+                await supabaseClient.from('lancamentos').insert(payload);
+            }
+        }
+        alert("Sincronizado! A data de lançamento foi preenchida.");
+        location.reload();
     }
 
     function exibirTabela(dados) {
@@ -254,32 +291,6 @@
             dom: 'rtip', pageLength: 25, order: [[1, 'desc']]
         });
         configurarFiltros();
-    }
-
-    async function enviarParaSupabase() {
-        const novos = dadosAcumulados.filter(item => String(item.id).includes('.'));
-        for (const item of novos) {
-            const { data: ex } = await supabaseClient.from('lancamentos').select('id, competencia').eq('convenio', item.convenio).maybeSingle();
-            
-            const payload = {
-                convenio: item.convenio,
-                responsavel: item.responsavel,
-                sistema: item.sistema,
-                data_corte: item.data_corte,
-                competencia: item.competencia,
-                status: 'Pendente'
-            };
-
-            if (ex) {
-                if (ex.competencia !== item.competencia) {
-                    await supabaseClient.from('lancamentos').update(payload).eq('id', ex.id);
-                }
-            } else {
-                await supabaseClient.from('lancamentos').insert(payload);
-            }
-        }
-        alert("Sincronizado!");
-        location.reload();
     }
 
     async function toggleStatus(id, status) {
