@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lembrete de Lançamento</title>
+    <title>Lembrete de Lançamento | Dashboard AKRK</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     
     <style>
         body { background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -21,9 +22,7 @@
         .select-all-link { font-size: 0.75rem; text-decoration: none; color: #3598db; cursor: pointer; font-weight: bold; }
         .competencia-badge { background-color: #d1d8e0; color: #2d3436; font-weight: bold; padding: 5px 10px; border-radius: 6px; }
         .btn-status { min-width: 120px; font-size: 0.85rem; font-weight: 600; border-radius: 8px; }
-        #saudacao { font-size: 0.9rem; margin-top: 5px; }
-
-        /* BARRA DE ROLAGEM INTERNA - SEM PAGINAÇÃO */
+        
         #tabelaContainer { 
             max-height: 80vh; 
             overflow-y: auto; 
@@ -40,7 +39,6 @@
 
         .dataTables_filter { margin-bottom: 20px; }
         .dataTables_filter input { border-radius: 8px; border: 1px solid #ddd; padding: 5px 15px; outline: none; }
-        
         .btn-excel { background-color: #1d6f42; color: white; border: none; }
         .btn-excel:hover { background-color: #145a34; color: white; }
     </style>
@@ -89,10 +87,10 @@
 
             <div class="filter-section shadow-sm">
                 <div class="filter-title">Competência <span class="select-all-link" onclick="toggleAll('filter-periodo')">Desmarcar Todos</span></div>
-                <div id="filter-periodo" class="scroll-filter mb-3"><p class="text-muted small">Aguardando...</p></div>
+                <div id="filter-periodo" class="scroll-filter mb-3"></div>
                 <hr>
                 <div class="filter-title">Responsável <span class="select-all-link" onclick="toggleAll('filter-responsaveis')">Desmarcar Todos</span></div>
-                <div id="filter-responsaveis" class="scroll-filter mb-3"><p class="text-muted small">Aguardando...</p></div>
+                <div id="filter-responsaveis" class="scroll-filter mb-3"></div>
                 <hr>
                 <div class="filter-title">Status Atual</div>
                 <div id="filter-status" class="mb-3">
@@ -120,6 +118,7 @@
 <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
     const _URL = 'https://yqfswykeybzaaysoygjd.supabase.co'; 
@@ -207,8 +206,8 @@
 
         table = $('#tabelaLancamentos').DataTable({
             data: dados,
-            paging: false, // DESATIVA A TROCA DE PÁGINA
-            scrollY: '60vh', // ROLAGEM INTERNA
+            paging: false,
+            scrollY: '60vh',
             scrollCollapse: true,
             columns: [
                 { data: 'convenio', render: d => `<small class="fw-bold">${d || ''}</small>` },
@@ -227,23 +226,63 @@
         configurarFiltros();
     }
 
+    // --- FUNÇÃO COM TRAVA DE SEGURANÇA E MENSAGEM ---
     async function toggleStatus(id) {
         const item = dadosAcumulados.find(d => String(d.id) === String(id));
         if (!item) return;
-        item.status = item.status === 'Concluído' ? 'Pendente' : 'Concluído';
-        table.rows().every(function() { if (String(this.data().id) === String(id)) this.data(item).draw(false); });
-        atualizarCards();
-        if (!String(id).includes('.')) await supabaseClient.from('lancamentos').update({ status: item.status }).eq('id', id);
+
+        // SE O STATUS JÁ FOR CONCLUÍDO, BLOQUEIA COM MENSAGEM
+        if (item.status === 'Concluído') {
+            Swal.fire({
+                icon: 'error',
+                title: 'Ação Bloqueada',
+                text: 'Este item já foi concluído. Para desfazer, entre em contato com o administrador do sistema.',
+                confirmButtonColor: '#2c3e50',
+                focusConfirm: false,
+                allowOutsideClick: false
+            });
+            return;
+        }
+
+        // Se estiver pendente, pede confirmação
+        Swal.fire({
+            title: 'Confirmar Lançamento?',
+            text: `Deseja marcar "${item.convenio}" como CONCLUÍDO?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#198754',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Sim, concluir!',
+            cancelButtonText: 'Cancelar'
+        }).then(async (result) => {
+            if (result.isConfirmed) {
+                item.status = 'Concluído';
+                
+                table.rows().every(function() { 
+                    if (String(this.data().id) === String(id)) this.data(item).draw(false); 
+                });
+
+                atualizarCards();
+
+                if (!String(id).includes('.')) {
+                    await supabaseClient.from('lancamentos').update({ status: 'Concluído' }).eq('id', id);
+                }
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sucesso!',
+                    text: 'O status foi atualizado para Concluído.',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            }
+        });
     }
 
     function exportarParaExcel() {
         const filtro = document.getElementById('filtroExportar').value;
         let dadosFiltrados = [...dadosAcumulados];
-
-        if (filtro !== 'Todos') {
-            dadosFiltrados = dadosAcumulados.filter(d => d.status === filtro);
-        }
-
+        if (filtro !== 'Todos') dadosFiltrados = dadosAcumulados.filter(d => d.status === filtro);
         if (dadosFiltrados.length === 0) return alert("Nenhum dado para exportar!");
 
         const dadosExcel = dadosFiltrados.map(d => ({
