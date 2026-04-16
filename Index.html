@@ -306,7 +306,7 @@
     async function concluirSelecionados() {
         const ids = $('.select-item:checked').map(function() { return $(this).data('id'); }).get();
         const result = await Swal.fire({
-            title: 'Concluir em Massa?',
+            title: 'Concluir convenios selecionados?',
             text: `Deseja marcar os ${ids.length} itens selecionados como CONCLUÍDOS?`,
             icon: 'warning',
             showCancelButton: true,
