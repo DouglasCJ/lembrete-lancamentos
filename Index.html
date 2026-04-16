@@ -41,6 +41,10 @@
         .dataTables_filter input { border-radius: 8px; border: 1px solid #ddd; padding: 5px 15px; outline: none; }
         .btn-excel { background-color: #1d6f42; color: white; border: none; }
         .btn-excel:hover { background-color: #145a34; color: white; }
+
+        .row-checkbox { width: 18px; height: 18px; cursor: pointer; }
+        .selected-actions { display: none; margin-bottom: 15px; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -101,6 +105,13 @@
         </div>
 
         <div class="col-lg-9">
+            <div id="bulkActions" class="selected-actions bg-white p-3 rounded-3 shadow-sm border-start border-primary border-4 d-flex justify-content-between align-items-center">
+                <span><strong id="selectedCount">0</strong> itens selecionados</span>
+                <button class="btn btn-primary fw-bold" onclick="concluirSelecionados()">
+                    <i class="fas fa-check-double me-2"></i>Concluir Selecionados
+                </button>
+            </div>
+
             <div class="card p-4 shadow-sm">
                 <div id="tabelaContainer">
                     <div class="text-center py-5 text-muted">
@@ -151,8 +162,17 @@
         const dObj = converterDataBR(dataRaw);
         let mes = dObj.getMonth() + 1;
         let ano = dObj.getFullYear();
-        if (String(nomeConvenio).toUpperCase().includes("PINDARÉ") || dObj.getDate() > 20) {
-            mes++; if (mes > 12) { mes = 1; ano++; }
+        const dia = dObj.getDate();
+        const nomeUpper = String(nomeConvenio).toUpperCase();
+
+        const ehItapecuru = nomeUpper.includes("ITAPECURU");
+        const ehPindare = nomeUpper.includes("PINDARÉ");
+        const ehDuqueIMPDC = nomeUpper === "PREF. DUQUE DE CAXIAS - IMPDC";
+        const passouDiaVinte = dia > 20;
+
+        if (ehItapecuru || ehPindare || ehDuqueIMPDC || passouDiaVinte) {
+            mes++; 
+            if (mes > 12) { mes = 1; ano++; }
         }
         return `${String(mes).padStart(2, '0')}/${ano}`;
     }
@@ -167,6 +187,7 @@
         }
     }
 
+    // --- FUNÇÃO DE PROCESSAMENTO COM MEMÓRIA DE STATUS ---
     function processarExcel() {
         const input = document.getElementById('inputExcel');
         const reader = new FileReader();
@@ -174,20 +195,38 @@
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, {type: 'array'});
             const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+            
             const novos = json.map(item => {
-                let conv = ajustarNomeConvenio(item['Convênio'] || item.convenio);
+                let convRaw = item['Convênio'] || item.convenio;
+                let convLimpo = ajustarNomeConvenio(convRaw);
+                let compCalculada = calcularCompetenciaAKRK(convRaw, item['Data de Corte'] || item.data_corte);
+                
+                // LÓGICA DE PERSISTÊNCIA:
+                // Procura nos dados atuais se já existe esse convênio na MESMA competência
+                const registroExistente = dadosAcumulados.find(d => 
+                    d.convenio === convLimpo && d.competencia === compCalculada
+                );
+
+                // Se existir e estiver concluído, mantém 'Concluído'. Caso contrário, 'Pendente'.
+                let statusFinal = (registroExistente && registroExistente.status === 'Concluído') ? 'Concluído' : 'Pendente';
+
                 return {
                     id: Date.now() + Math.random(), 
-                    convenio: conv,
+                    convenio: convLimpo,
                     responsavel: item['Responsável'] || item.responsavel,
                     sistema: item['Sistema'] || item.sistema,
                     data_corte: converterDataBR(item['Data de Corte'] || item.data_corte).toISOString().split('T')[0],
                     data_lancamento: converterDataBR(item['Data de Lançamento'] || item.data_lancamento).toISOString().split('T')[0],
-                    competencia: calcularCompetenciaAKRK(conv, item['Data de Corte'] || item.data_corte),
-                    status: 'Pendente'
+                    competencia: compCalculada,
+                    status: statusFinal
                 };
             });
-            dadosAcumulados = [...dadosAcumulados, ...novos];
+            
+            // Filtramos duplicados que acabaram de ser gerados no map para não repetir na visualização
+            dadosAcumulados = [...dadosAcumulados, ...novos.filter(n => 
+                !dadosAcumulados.some(d => d.convenio === n.convenio && d.competencia === n.competencia)
+            )];
+
             exibirTabela(dadosAcumulados);
             document.getElementById('btnSalvar').style.display = 'block';
         };
@@ -197,11 +236,21 @@
     function exibirTabela(dados) {
         if ($.fn.DataTable.isDataTable('#tabelaLancamentos')) {
             table.clear().rows.add(dados).draw();
+            updateBulkUI();
             return;
         }
 
         document.getElementById('tabelaContainer').innerHTML = `<table id="tabelaLancamentos" class="table table-hover w-100 align-middle">
-            <thead class="table-light"><tr><th>Convênio</th><th>Competência</th><th>Responsável</th><th>Corte</th><th class="text-center">Ação</th></tr></thead>
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 40px;"><input type="checkbox" id="selectAllRows" class="row-checkbox"></th>
+                    <th>Convênio</th>
+                    <th>Competência</th>
+                    <th>Responsável</th>
+                    <th>Corte</th>
+                    <th class="text-center">Ação</th>
+                </tr>
+            </thead>
             <tbody></tbody></table>`;
 
         table = $('#tabelaLancamentos').DataTable({
@@ -209,7 +258,15 @@
             paging: false,
             scrollY: '60vh',
             scrollCollapse: true,
+            order: [[2, 'desc']],
             columns: [
+                { 
+                    data: null, 
+                    orderable: false, 
+                    render: (data, type, row) => {
+                        return row.status === 'Pendente' ? `<input type="checkbox" class="row-checkbox select-item" data-id="${row.id}">` : '';
+                    } 
+                },
                 { data: 'convenio', render: d => `<small class="fw-bold">${d || ''}</small>` },
                 { data: 'competencia', render: d => `<span class="badge competencia-badge">${d || ''}</span>` },
                 { data: 'responsavel', render: d => `<span class="small text-muted">${d || ''}</span>` },
@@ -220,61 +277,92 @@
                 }}
             ],
             language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json', search: "🔍 Pesquisar:" },
-            dom: 'f rtip',
-            stateSave: true 
+            dom: 'f rtip'
         });
+
+        $('#selectAllRows').on('click', function() {
+            $('.select-item').prop('checked', this.checked);
+            updateBulkUI();
+        });
+
+        $('#tabelaLancamentos tbody').on('change', '.select-item', function() {
+            updateBulkUI();
+        });
+
         configurarFiltros();
     }
 
-    // --- FUNÇÃO COM TRAVA DE SEGURANÇA E MENSAGEM ---
+    function updateBulkUI() {
+        const count = $('.select-item:checked').length;
+        if (count > 0) {
+            $('#bulkActions').fadeIn().css('display', 'flex');
+            $('#selectedCount').text(count);
+        } else {
+            $('#bulkActions').fadeOut();
+            $('#selectAllRows').prop('checked', false);
+        }
+    }
+
+    async function concluirSelecionados() {
+        const ids = $('.select-item:checked').map(function() { return $(this).data('id'); }).get();
+        const result = await Swal.fire({
+            title: 'Concluir em Massa?',
+            text: `Deseja marcar os ${ids.length} itens selecionados como CONCLUÍDOS?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#198754',
+            confirmButtonText: 'Sim, concluir tudo!',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (result.isConfirmed) {
+            Swal.fire({ title: 'Sincronizando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            for (const id of ids) {
+                const item = dadosAcumulados.find(d => String(d.id) === String(id));
+                if (item && item.status === 'Pendente') {
+                    item.status = 'Concluído';
+                    if (!String(id).includes('.')) {
+                        await supabaseClient.from('lancamentos').update({ status: 'Concluído' }).eq('id', id);
+                    }
+                }
+            }
+            exibirTabela(dadosAcumulados);
+            atualizarCards();
+            Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Itens atualizados.', timer: 2000, showConfirmButton: false });
+        }
+    }
+
     async function toggleStatus(id) {
         const item = dadosAcumulados.find(d => String(d.id) === String(id));
         if (!item) return;
 
-        // SE O STATUS JÁ FOR CONCLUÍDO, BLOQUEIA COM MENSAGEM
         if (item.status === 'Concluído') {
             Swal.fire({
                 icon: 'error',
                 title: 'Ação Bloqueada',
-                text: 'Este item já foi concluído. Para desfazer, entre em contato com o administrador do sistema.',
-                confirmButtonColor: '#2c3e50',
-                focusConfirm: false,
-                allowOutsideClick: false
+                text: 'Para desfazer, contate o administrador.',
+                confirmButtonColor: '#2c3e50'
             });
             return;
         }
 
-        // Se estiver pendente, pede confirmação
         Swal.fire({
             title: 'Confirmar Lançamento?',
             text: `Deseja marcar "${item.convenio}" como CONCLUÍDO?`,
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#198754',
-            cancelButtonColor: '#d33',
             confirmButtonText: 'Sim, concluir!',
             cancelButtonText: 'Cancelar'
         }).then(async (result) => {
             if (result.isConfirmed) {
                 item.status = 'Concluído';
-                
-                table.rows().every(function() { 
-                    if (String(this.data().id) === String(id)) this.data(item).draw(false); 
-                });
-
+                exibirTabela(dadosAcumulados);
                 atualizarCards();
-
                 if (!String(id).includes('.')) {
                     await supabaseClient.from('lancamentos').update({ status: 'Concluído' }).eq('id', id);
                 }
-
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Sucesso!',
-                    text: 'O status foi atualizado para Concluído.',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
+                Swal.fire({ icon: 'success', title: 'Sucesso!', timer: 1500, showConfirmButton: false });
             }
         });
     }
@@ -283,22 +371,17 @@
         const filtro = document.getElementById('filtroExportar').value;
         let dadosFiltrados = [...dadosAcumulados];
         if (filtro !== 'Todos') dadosFiltrados = dadosAcumulados.filter(d => d.status === filtro);
-        if (dadosFiltrados.length === 0) return alert("Nenhum dado para exportar!");
+        if (dadosFiltrados.length === 0) return alert("Nenhum dado!");
 
         const dadosExcel = dadosFiltrados.map(d => ({
-            "Convênio": d.convenio,
-            "Competência": d.competencia,
-            "Responsável": d.responsavel,
-            "Sistema": d.sistema,
-            "Data de Lançamento": new Date(d.data_lancamento + 'T12:00:00').toLocaleDateString('pt-BR'),
-            "Data de Corte": new Date(d.data_corte + 'T12:00:00').toLocaleDateString('pt-BR'),
-            "Status": d.status
+            "Convênio": d.convenio, "Competência": d.competencia, "Responsável": d.responsavel, "Sistema": d.sistema,
+            "Corte": new Date(d.data_corte + 'T12:00:00').toLocaleDateString('pt-BR'), "Status": d.status
         }));
 
         const ws = XLSX.utils.json_to_sheet(dadosExcel);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Relatório");
-        XLSX.writeFile(wb, `Relatorio_${filtro}_${new Date().toLocaleDateString('pt-BR')}.xlsx`);
+        XLSX.writeFile(wb, `Relatorio_AKRK_${new Date().toLocaleDateString('pt-BR')}.xlsx`);
     }
 
     function gerarChecklistFiltros(dados) {
@@ -321,13 +404,30 @@
 
     async function enviarParaSupabase() {
         const novos = dadosAcumulados.filter(item => String(item.id).includes('.'));
+        if (novos.length === 0) return;
+
+        Swal.fire({ title: 'Sincronizando novos dados...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
         for (const item of novos) {
-            const { data: exArray } = await supabaseClient.from('lancamentos').select('id').eq('convenio', item.convenio).limit(1);
-            const payload = { ...item }; delete payload.id;
-            if (exArray?.length > 0) await supabaseClient.from('lancamentos').update(payload).eq('id', exArray[0].id);
-            else await supabaseClient.from('lancamentos').insert(payload);
+            const { data: exArray } = await supabaseClient
+                .from('lancamentos')
+                .select('id')
+                .eq('convenio', item.convenio)
+                .eq('competencia', item.competencia)
+                .limit(1);
+
+            const payload = { ...item }; 
+            delete payload.id;
+
+            if (exArray && exArray.length > 0) {
+                await supabaseClient.from('lancamentos').update(payload).eq('id', exArray[0].id);
+            } else {
+                await supabaseClient.from('lancamentos').insert(payload);
+            }
         }
-        alert("Sincronizado!"); location.reload();
+        
+        Swal.fire({ icon: 'success', title: 'Sincronizado!', showConfirmButton: false, timer: 1500 });
+        setTimeout(() => location.reload(), 1600);
     }
 
     function atualizarCards() {
