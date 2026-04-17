@@ -14,35 +14,13 @@
         body { background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .navbar { background-color: #2c3e50; padding: 15px 0; border-bottom: 3px solid #3498db; }
         .card { border: none; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); transition: transform 0.2s; }
-        .card:hover { transform: translateY(-5px); }
         .card-resumo { color: white; padding: 20px; }
         .filter-section { background: #fff; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #e0e0e0; }
         .filter-title { font-size: 0.85rem; font-weight: bold; color: #7f8c8d; text-transform: uppercase; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .scroll-filter { max-height: 150px; overflow-y: auto; padding-right: 5px; }
         .select-all-link { font-size: 0.75rem; text-decoration: none; color: #3598db; cursor: pointer; font-weight: bold; }
-        .competencia-badge { background-color: #d1d8e0; color: #2d3436; font-weight: bold; padding: 5px 10px; border-radius: 6px; }
         .btn-status { min-width: 120px; font-size: 0.85rem; font-weight: 600; border-radius: 8px; }
-        
-        #tabelaContainer { 
-            max-height: 80vh; 
-            overflow-y: auto; 
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 10px;
-        }
-        #tabelaLancamentos thead {
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            background-color: white;
-        }
-
-        .dataTables_filter { margin-bottom: 20px; }
-        .dataTables_filter input { border-radius: 8px; border: 1px solid #ddd; padding: 5px 15px; outline: none; }
-        .btn-excel { background-color: #1d6f42; color: white; border: none; }
-        .btn-excel:hover { background-color: #145a34; color: white; }
-
-        .row-checkbox { width: 18px; height: 18px; cursor: pointer; }
+        #tabelaContainer { max-height: 80vh; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 10px; }
+        #tabelaLancamentos thead { position: sticky; top: 0; z-index: 100; background-color: white; }
         .selected-actions { display: none; margin-bottom: 15px; animation: fadeIn 0.3s; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -51,9 +29,7 @@
 
 <nav class="navbar navbar-dark mb-4 shadow-sm">
     <div class="container-fluid px-4 d-flex justify-content-between align-items-center">
-        <div>
-            <span class="navbar-brand fw-bold m-0"><i class="fas fa-rocket me-2"></i> Lembrete de Lançamento</span>
-        </div>
+        <span class="navbar-brand fw-bold m-0"><i class="fas fa-rocket me-2"></i> Lembrete de Lançamento</span>
         <div class="text-white text-end">
             <small class="d-block opacity-75">Data de Hoje</small>
             <strong id="dataAtual">--/--/----</strong>
@@ -77,48 +53,42 @@
                 <button class="btn btn-success w-100 shadow fw-bold" id="btnSalvar" style="display:none;" onclick="enviarParaSupabase()">Sincronizar no Banco</button>
             </div>
 
-            <div class="card p-3 mb-4 shadow-sm">
-                <h6 class="fw-bold mb-3 text-success"><i class="fas fa-download me-2"></i>Exportar Relatório</h6>
-                <select id="filtroExportar" class="form-select form-select-sm mb-3">
-                    <option value="Todos">Todos os Registros</option>
+            <div class="filter-section shadow-sm">
+                <div class="filter-title"><span>Filtros</span><span class="select-all-link" onclick="limparFiltros()">Limpar</span></div>
+                <label class="small fw-bold text-muted mb-1">Competência</label>
+                <select id="select-periodo" class="form-select form-select-sm mb-3" onchange="table.draw()"><option value="Todos">Todas</option></select>
+                <label class="small fw-bold text-muted mb-1">Responsável</label>
+                <select id="select-responsaveis" class="form-select form-select-sm mb-3" onchange="table.draw()"><option value="Todos">Todos</option></select>
+                <hr>
+                <label class="small fw-bold text-muted mb-2 d-block">Status na Tela</label>
+                <div class="btn-group w-100" role="group">
+                    <input type="checkbox" class="btn-check filter-check" id="status-Pendente" value="Pendente" checked onchange="table.draw()">
+                    <label class="btn btn-outline-warning btn-sm fw-bold" for="status-Pendente">Pendentes</label>
+                    <input type="checkbox" class="btn-check filter-check" id="status-Concluido" value="Concluído" checked onchange="table.draw()">
+                    <label class="btn btn-outline-success btn-sm fw-bold" for="status-Concluido">Concluídos</label>
+                </div>
+            </div>
+            
+            <div class="card p-3 mb-4 shadow-sm border-success">
+                <h6 class="fw-bold mb-3 text-success"><i class="fas fa-file-export me-2"></i>Exportar Relatório</h6>
+                <select id="tipoExportacao" class="form-select form-select-sm mb-3">
+                    <option value="Todos">Todos os registros</option>
                     <option value="Pendente">Apenas Pendentes</option>
                     <option value="Concluído">Apenas Concluídos</option>
                 </select>
-                <button class="btn btn-excel btn-sm w-100 fw-bold" onclick="exportarParaExcel()">
-                    <i class="fas fa-file-export me-2"></i>Baixar Excel
+                <button class="btn btn-success btn-sm w-100 fw-bold" onclick="exportarParaExcel()">
+                    <i class="fas fa-download me-2"></i>Baixar Excel
                 </button>
-            </div>
-
-            <div class="filter-section shadow-sm">
-                <div class="filter-title">Competência <span class="select-all-link" onclick="toggleAll('filter-periodo')">Desmarcar Todos</span></div>
-                <div id="filter-periodo" class="scroll-filter mb-3"></div>
-                <hr>
-                <div class="filter-title">Responsável <span class="select-all-link" onclick="toggleAll('filter-responsaveis')">Desmarcar Todos</span></div>
-                <div id="filter-responsaveis" class="scroll-filter mb-3"></div>
-                <hr>
-                <div class="filter-title">Status Atual</div>
-                <div id="filter-status" class="mb-3">
-                    <div class="form-check"><input class="form-check-input filter-check" type="checkbox" value="Pendente" id="status-Pendente" checked><label class="form-check-label">Pendente</label></div>
-                    <div class="form-check"><input class="form-check-input filter-check" type="checkbox" value="Concluído" id="status-Concluido" checked><label class="form-check-label">Concluído</label></div>
-                </div>
             </div>
         </div>
 
         <div class="col-lg-9">
             <div id="bulkActions" class="selected-actions bg-white p-3 rounded-3 shadow-sm border-start border-primary border-4 d-flex justify-content-between align-items-center">
                 <span><strong id="selectedCount">0</strong> itens selecionados</span>
-                <button class="btn btn-primary fw-bold" onclick="concluirSelecionados()">
-                    <i class="fas fa-check-double me-2"></i>Concluir Selecionados
-                </button>
+                <button class="btn btn-primary fw-bold" onclick="concluirSelecionados()">Concluir Selecionados</button>
             </div>
-
             <div class="card p-4 shadow-sm">
-                <div id="tabelaContainer">
-                    <div class="text-center py-5 text-muted">
-                        <i class="fas fa-database fa-3x mb-3 opacity-25"></i>
-                        <p>Nenhum dado encontrado no histórico.</p>
-                    </div>
-                </div>
+                <div id="tabelaContainer"></div>
             </div>
         </div>
     </div>
@@ -139,12 +109,11 @@
     let table;
     let dadosAcumulados = [];
 
-    function ajustarNomeConvenio(nome) {
+    function normalizarNome(nome) {
         if (!nome) return "";
-        const n = String(nome).trim();
-        const upper = n.toUpperCase();
-        if (upper.includes("GOV. SÃO PAULO") && !upper.includes("PMESP") && !upper.includes("SPPREV")) return "GOV. SÃO PAULO - GERAL";
-        return n;
+        let n = String(nome).trim().toUpperCase();
+        if (n.includes("GOV. SÃO PAULO") && !n.includes("PMESP") && !n.includes("SPPREV")) n = "GOV. SÃO PAULO - GERAL";
+        return n.replace(/\s\s+/g, ' ');
     }
 
     function converterDataBR(valor) {
@@ -163,16 +132,9 @@
         let mes = dObj.getMonth() + 1;
         let ano = dObj.getFullYear();
         const dia = dObj.getDate();
-        const nomeUpper = String(nomeConvenio).toUpperCase();
-
-        const ehItapecuru = nomeUpper.includes("ITAPECURU");
-        const ehPindare = nomeUpper.includes("PINDARÉ");
-        const ehDuqueIMPDC = nomeUpper === "PREF. DUQUE DE CAXIAS - IMPDC";
-        const passouDiaVinte = dia > 20;
-
-        if (ehItapecuru || ehPindare || ehDuqueIMPDC || passouDiaVinte) {
-            mes++; 
-            if (mes > 12) { mes = 1; ano++; }
+        const n = String(nomeConvenio).toUpperCase();
+        if (n.includes("ITAPECURU") || n.includes("PINDARÉ") || n.includes("IMPDC") || dia > 20) {
+            mes++; if (mes > 12) { mes = 1; ano++; }
         }
         return `${String(mes).padStart(2, '0')}/${ano}`;
     }
@@ -180,53 +142,61 @@
     async function carregarDadosBanco() {
         const { data } = await supabaseClient.from('lancamentos').select('*');
         if (data) {
-            dadosAcumulados = data.map(item => ({ ...item, convenio: ajustarNomeConvenio(item.convenio) }));
+            dadosAcumulados = data.map(item => ({ ...item, convenio: normalizarNome(item.convenio) }));
             exibirTabela(dadosAcumulados);
-            gerarChecklistFiltros(dadosAcumulados);
+            gerarSelectFiltros(dadosAcumulados);
             atualizarCards();
         }
     }
 
     function processarExcel() {
         const input = document.getElementById('inputExcel');
-        if (!input.files.length) return Swal.fire("Aviso", "Selecione um arquivo!", "warning");
-
+        if (!input.files.length) return;
         const reader = new FileReader();
         reader.onload = function(e) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, {type: 'array'});
             const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
             
-            const novos = json.map(item => {
+            const mapa = new Map();
+            dadosAcumulados.forEach(d => mapa.set(normalizarNome(d.convenio), d));
+
+            json.forEach(item => {
                 let convRaw = item['Convênio'] || item.convenio;
-                let convLimpo = ajustarNomeConvenio(convRaw);
+                let convLimpo = normalizarNome(convRaw);
                 let compCalculada = calcularCompetenciaAKRK(convRaw, item['Data de Corte'] || item.data_corte);
+                let novoCorteISO = converterDataBR(item['Data de Corte'] || item.data_corte).toISOString().split('T')[0];
                 
-                // Busca se já existe no banco para manter status concluído
-                const registroExistente = dadosAcumulados.find(d => 
-                    d.convenio === convLimpo && d.competencia === compCalculada && !String(d.id).startsWith('new_')
-                );
+                // AJUSTE AQUI: Garante que pegue o responsável com ou sem acento
+                let respPlanilha = item['Responsável'] || item['Responsavel'] || item.responsavel || "";
 
-                let statusFinal = (registroExistente && registroExistente.status === 'Concluído') ? 'Concluído' : 'Pendente';
+                let statusFinal = 'Pendente';
+                let idExistente = null;
 
-                return {
-                    id: "new_" + Math.random().toString(36).substr(2, 9), 
+                if (mapa.has(convLimpo)) {
+                    const anterior = mapa.get(convLimpo);
+                    if (anterior.data_corte === novoCorteISO && anterior.competencia === compCalculada) {
+                        statusFinal = anterior.status;
+                    }
+                    idExistente = anterior.id;
+                }
+
+                mapa.set(convLimpo, {
+                    id: idExistente && !String(idExistente).startsWith('new_') ? "new_upd_" + idExistente : "new_" + Math.random().toString(36).substr(2, 9),
                     convenio: convLimpo,
-                    responsavel: item['Responsável'] || item.responsavel,
+                    responsavel: respPlanilha,
                     sistema: item['Sistema'] || item.sistema,
-                    data_corte: converterDataBR(item['Data de Corte'] || item.data_corte).toISOString().split('T')[0],
+                    data_corte: novoCorteISO,
                     data_lancamento: converterDataBR(item['Data de Lançamento'] || item.data_lancamento).toISOString().split('T')[0],
                     competencia: compCalculada,
                     status: statusFinal
-                };
+                });
             });
-            
-            // Adiciona os novos registros à lista visual sem bloquear duplicados
-            dadosAcumulados = [...dadosAcumulados, ...novos];
 
+            dadosAcumulados = Array.from(mapa.values());
             exibirTabela(dadosAcumulados);
             document.getElementById('btnSalvar').style.display = 'block';
-            Swal.fire("Planilha Carregada", "Clique em Sincronizar para salvar no banco.", "success");
+            Swal.fire("Sucesso", "Planilha mesclada sem duplicatas.", "success");
         };
         reader.readAsArrayBuffer(input.files[0]);
     }
@@ -234,95 +204,60 @@
     function exibirTabela(dados) {
         if ($.fn.DataTable.isDataTable('#tabelaLancamentos')) {
             table.clear().rows.add(dados).draw();
-            updateBulkUI();
             return;
         }
-
-        document.getElementById('tabelaContainer').innerHTML = `<table id="tabelaLancamentos" class="table table-hover w-100 align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th style="width: 40px;"><input type="checkbox" id="selectAllRows" class="row-checkbox"></th>
-                    <th>Convênio</th><th>Competência</th><th>Responsável</th><th>Corte</th><th class="text-center">Ação</th>
-                </tr>
-            </thead>
-            <tbody></tbody></table>`;
-
+        document.getElementById('tabelaContainer').innerHTML = `<table id="tabelaLancamentos" class="table table-hover w-100 align-middle"><thead class="table-light"><tr><th style="width: 40px;"><input type="checkbox" id="selectAllRows"></th><th>Convênio</th><th>Competência</th><th>Responsável</th><th>Corte</th><th class="text-center">Ação</th></tr></thead><tbody></tbody></table>`;
         table = $('#tabelaLancamentos').DataTable({
-            data: dados,
-            paging: false,
-            scrollY: '60vh',
-            scrollCollapse: true,
-            order: [[2, 'desc']],
+            data: dados, paging: false, scrollY: '60vh', scrollCollapse: true, order: [[2, 'desc']],
             columns: [
-                { 
-                    data: null, orderable: false, 
-                    render: (data, type, row) => (row.status === 'Pendente') ? `<input type="checkbox" class="row-checkbox select-item" data-id="${row.id}">` : ''
-                },
-                { data: 'convenio', render: d => `<small class="fw-bold">${d || ''}</small>` },
-                { data: 'competencia', render: d => `<span class="badge competencia-badge">${d || ''}</span>` },
+                { data: null, orderable: false, render: (d, t, row) => (row.status !== 'Concluído') ? `<input type="checkbox" class="row-checkbox select-item" data-id="${row.id}">` : '' },
+                { data: 'convenio', render: d => `<small class="fw-bold">${d}</small>` },
+                { data: 'competencia', render: d => `<span class="badge bg-light text-dark border">${d}</span>` },
                 { data: 'responsavel', render: d => `<span class="small text-muted">${d || ''}</span>` },
                 { data: 'data_corte', render: d => `<span class="small">${new Date(d + 'T12:00:00').toLocaleDateString('pt-BR')}</span>` },
-                { data: null, className: 'text-center', render: (data, type, row) => {
-                    const status = row.status || 'Pendente';
-                    return `<button class="btn ${status === 'Concluído' ? 'btn-success' : 'btn-outline-secondary'} btn-sm btn-status w-100" onclick="toggleStatus('${row.id}')">${status}</button>`;
-                }}
+                { data: null, className: 'text-center', render: (d, t, row) => `<button class="btn ${row.status === 'Concluído' ? 'btn-success' : 'btn-outline-secondary'} btn-sm btn-status w-100" onclick="toggleStatus('${row.id}')">${row.status || 'Pendente'}</button>` }
             ],
-            language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json', search: "🔍 Pesquisar:" },
-            dom: 'f rtip'
+            language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/pt-BR.json', search: "🔍 Buscar:" }
         });
-
         $('#selectAllRows').on('click', function() { $('.select-item').prop('checked', this.checked); updateBulkUI(); });
         $('#tabelaLancamentos tbody').on('change', '.select-item', function() { updateBulkUI(); });
         configurarFiltros();
     }
 
-    function updateBulkUI() {
-        const count = $('.select-item:checked').length;
-        if (count > 0) { $('#bulkActions').fadeIn().css('display', 'flex'); $('#selectedCount').text(count); }
-        else { $('#bulkActions').fadeOut(); $('#selectAllRows').prop('checked', false); }
-    }
-
     async function toggleStatus(id) {
         const item = dadosAcumulados.find(d => String(d.id) === String(id));
-        if (!item) return;
-        if (item.status === 'Concluído') return Swal.fire("Ação Bloqueada", "Para desfazer, contate o administrador.", "error");
-
-        const result = await Swal.fire({ title: 'Concluir?', text: `Marcar "${item.convenio}" como CONCLUÍDO?`, icon: 'question', showCancelButton: true });
-        if (result.isConfirmed) {
-            item.status = 'Concluído';
-            exibirTabela(dadosAcumulados);
-            atualizarCards();
-            if (!String(id).startsWith('new_')) {
-                await supabaseClient.from('lancamentos').update({ status: 'Concluído' }).eq('id', id);
-            }
+        if (!item || item.status === 'Concluído') return Swal.fire("Ação Bloqueada", "Item finalizado.", "error");
+        const res = await Swal.fire({ title: 'Concluir?', text: `Marcar "${item.convenio}" como CONCLUÍDO?`, icon: 'question', showCancelButton: true });
+        if (res.isConfirmed) {
+            item.status = 'Concluído'; exibirTabela(dadosAcumulados); atualizarCards();
+            if (!String(id).startsWith('new_')) await supabaseClient.from('lancamentos').update({ status: 'Concluído' }).eq('id', id);
         }
     }
 
     async function concluirSelecionados() {
         const ids = $('.select-item:checked').map(function() { return $(this).data('id'); }).get();
-        const result = await Swal.fire({ title: 'Ação em Massa', text: `Concluir ${ids.length} itens?`, icon: 'warning', showCancelButton: true });
-        if (result.isConfirmed) {
-            Swal.fire({ title: 'Sincronizando...', didOpen: () => Swal.showLoading() });
+        const res = await Swal.fire({ title: 'Ação em Massa', text: `Concluir ${ids.length} itens?`, icon: 'warning', showCancelButton: true });
+        if (res.isConfirmed) {
             for (const id of ids) {
-                const item = dadosAcumulados.find(d => String(d.id) === String(id));
-                if (item && item.status === 'Pendente') {
-                    item.status = 'Concluído';
+                const it = dadosAcumulados.find(d => String(d.id) === String(id));
+                if (it && it.status === 'Pendente') {
+                    it.status = 'Concluído';
                     if (!String(id).startsWith('new_')) await supabaseClient.from('lancamentos').update({ status: 'Concluído' }).eq('id', id);
                 }
             }
             exibirTabela(dadosAcumulados); atualizarCards();
-            Swal.fire("Sucesso!", "Itens atualizados.", "success");
         }
     }
 
     async function enviarParaSupabase() {
         const novos = dadosAcumulados.filter(item => String(item.id).startsWith('new_'));
-        if (novos.length === 0) return Swal.fire("Aviso", "Não há novos registros para sincronizar.", "info");
-
+        if (novos.length === 0) return;
         Swal.fire({ title: 'Sincronizando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         for (const item of novos) {
-            const { data: exArray } = await supabaseClient.from('lancamentos').select('id').eq('convenio', item.convenio).eq('competencia', item.competencia).limit(1);
+            const convB = normalizarNome(item.convenio);
+            const { data: exArray } = await supabaseClient.from('lancamentos').select('id').eq('convenio', convB).limit(1);
             const payload = { ...item }; delete payload.id;
+            payload.convenio = convB;
             if (exArray && exArray.length > 0) await supabaseClient.from('lancamentos').update(payload).eq('id', exArray[0].id);
             else await supabaseClient.from('lancamentos').insert(payload);
         }
@@ -330,30 +265,45 @@
         setTimeout(() => location.reload(), 1600);
     }
 
-    function exportarParaExcel() {
-        const filtro = document.getElementById('filtroExportar').value;
-        let dF = (filtro !== 'Todos') ? dadosAcumulados.filter(d => d.status === filtro) : [...dadosAcumulados];
-        const ws = XLSX.utils.json_to_sheet(dF.map(d => ({ "Convênio": d.convenio, "Competência": d.competencia, "Responsável": d.responsavel, "Corte": d.data_corte, "Status": d.status })));
-        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Relatório");
-        XLSX.writeFile(wb, `Relatorio_AKRK.xlsx`);
-    }
-
-    function gerarChecklistFiltros(dados) {
+    function gerarSelectFiltros(dados) {
         const resps = [...new Set(dados.map(item => item.responsavel))].filter(Boolean).sort();
-        document.getElementById('filter-responsaveis').innerHTML = resps.map(r => `<div class="form-check"><input class="form-check-input filter-check" type="checkbox" value="${r}" checked><label class="form-check-label small">${r}</label></div>`).join('');
+        const selectResp = document.getElementById('select-responsaveis');
+        selectResp.innerHTML = '<option value="Todos">Todos</option>' + resps.map(r => `<option value="${r}">${r}</option>`).join('');
         const comps = [...new Set(dados.map(item => item.competencia))].filter(Boolean).sort((a, b) => b.localeCompare(a));
-        document.getElementById('filter-periodo').innerHTML = comps.map(c => `<div class="form-check"><input class="form-check-input filter-check-comp" type="checkbox" value="${c}" checked><label class="form-check-label small">${c}</label></div>`).join('');
-        $('.filter-check, .filter-check-comp').on('change', () => table.draw());
+        const selectComp = document.getElementById('select-periodo');
+        selectComp.innerHTML = '<option value="Todos">Todas</option>' + comps.map(c => `<option value="${c}">${c}</option>`).join('');
     }
 
     function configurarFiltros() {
         $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
-            const rSel = $('#filter-responsaveis input:checked').map(function() { return $(this).val(); }).get();
-            const cSel = $('#filter-periodo input:checked').map(function() { return $(this).val(); }).get();
-            const sSel = $('#filter-status input:checked').map(function() { return $(this).val(); }).get();
-            const rowData = table.row(dataIndex).data();
-            return rSel.includes(rowData.responsavel) && cSel.includes(rowData.competencia) && sSel.includes(rowData.status);
+            const rSel = $('#select-responsaveis').val();
+            const cSel = $('#select-periodo').val();
+            const sSel = $('.filter-check:checked').map(function() { return $(this).val(); }).get();
+            const row = table.row(dataIndex).data();
+            const matchResp = (rSel === 'Todos' || row.responsavel === rSel);
+            const matchComp = (cSel === 'Todos' || row.competencia === cSel);
+            const matchStatus = sSel.includes(row.status);
+            return matchResp && matchComp && matchStatus;
         });
+    }
+
+    function limparFiltros() { $('#select-responsaveis').val('Todos'); $('#select-periodo').val('Todos'); $('.filter-check').prop('checked', true); table.draw(); }
+
+    function exportarParaExcel() {
+        const tipo = document.getElementById('tipoExportacao').value;
+        let dadosFiltrados = table.rows({ filter: 'applied' }).data().toArray();
+        if (tipo !== 'Todos') dadosFiltrados = dadosFiltrados.filter(d => d.status === tipo);
+        if (dadosFiltrados.length === 0) return Swal.fire("Aviso", "Sem dados.", "warning");
+        const formatarData = (str) => { if (!str) return ""; return new Date(str + 'T12:00:00').toLocaleDateString('pt-BR'); };
+        const dadosExcel = dadosFiltrados.map(d => ({ 
+            "Convênio": d.convenio, "Competência": d.competencia, "Responsável": d.responsavel, 
+            "Sistema": d.sistema || "", "Data de Corte": formatarData(d.data_corte), 
+            "Data de Lançamento": formatarData(d.data_lancamento), "Status": d.status 
+        }));
+        const ws = XLSX.utils.json_to_sheet(dadosExcel);
+        const wb = XLSX.utils.book_new(); 
+        XLSX.utils.book_append_sheet(wb, ws, "Exportação_AKRK");
+        XLSX.writeFile(wb, `Relatorio_AKRK_${tipo}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.xlsx`);
     }
 
     function atualizarCards() {
@@ -362,7 +312,12 @@
         document.getElementById('countConcluido').innerText = dadosAcumulados.filter(d => d.status === 'Concluído').length;
     }
 
-    function toggleAll(id) { $(`#${id} input`).each(function() { this.checked = !this.checked; }); table.draw(); }
+    function updateBulkUI() {
+        const count = $('.select-item:checked').length;
+        if (count > 0) { $('#bulkActions').fadeIn().css('display', 'flex'); $('#selectedCount').text(count); }
+        else { $('#bulkActions').fadeOut(); $('#selectAllRows').prop('checked', false); }
+    }
+
     document.getElementById('dataAtual').innerText = new Date().toLocaleDateString('pt-BR');
     carregarDadosBanco();
 </script>
