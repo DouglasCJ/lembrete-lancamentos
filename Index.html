@@ -187,9 +187,10 @@
         }
     }
 
-    // --- FUNÇÃO DE PROCESSAMENTO COM MEMÓRIA DE STATUS ---
     function processarExcel() {
         const input = document.getElementById('inputExcel');
+        if (!input.files.length) return Swal.fire("Aviso", "Selecione um arquivo!", "warning");
+
         const reader = new FileReader();
         reader.onload = function(e) {
             const data = new Uint8Array(e.target.result);
@@ -201,17 +202,15 @@
                 let convLimpo = ajustarNomeConvenio(convRaw);
                 let compCalculada = calcularCompetenciaAKRK(convRaw, item['Data de Corte'] || item.data_corte);
                 
-                // LÓGICA DE PERSISTÊNCIA:
-                // Procura nos dados atuais se já existe esse convênio na MESMA competência
+                // Busca se já existe no banco para manter status concluído
                 const registroExistente = dadosAcumulados.find(d => 
-                    d.convenio === convLimpo && d.competencia === compCalculada
+                    d.convenio === convLimpo && d.competencia === compCalculada && !String(d.id).startsWith('new_')
                 );
 
-                // Se existir e estiver concluído, mantém 'Concluído'. Caso contrário, 'Pendente'.
                 let statusFinal = (registroExistente && registroExistente.status === 'Concluído') ? 'Concluído' : 'Pendente';
 
                 return {
-                    id: Date.now() + Math.random(), 
+                    id: "new_" + Math.random().toString(36).substr(2, 9), 
                     convenio: convLimpo,
                     responsavel: item['Responsável'] || item.responsavel,
                     sistema: item['Sistema'] || item.sistema,
@@ -222,13 +221,12 @@
                 };
             });
             
-            // Filtramos duplicados que acabaram de ser gerados no map para não repetir na visualização
-            dadosAcumulados = [...dadosAcumulados, ...novos.filter(n => 
-                !dadosAcumulados.some(d => d.convenio === n.convenio && d.competencia === n.competencia)
-            )];
+            // Adiciona os novos registros à lista visual sem bloquear duplicados
+            dadosAcumulados = [...dadosAcumulados, ...novos];
 
             exibirTabela(dadosAcumulados);
             document.getElementById('btnSalvar').style.display = 'block';
+            Swal.fire("Planilha Carregada", "Clique em Sincronizar para salvar no banco.", "success");
         };
         reader.readAsArrayBuffer(input.files[0]);
     }
@@ -244,11 +242,7 @@
             <thead class="table-light">
                 <tr>
                     <th style="width: 40px;"><input type="checkbox" id="selectAllRows" class="row-checkbox"></th>
-                    <th>Convênio</th>
-                    <th>Competência</th>
-                    <th>Responsável</th>
-                    <th>Corte</th>
-                    <th class="text-center">Ação</th>
+                    <th>Convênio</th><th>Competência</th><th>Responsável</th><th>Corte</th><th class="text-center">Ação</th>
                 </tr>
             </thead>
             <tbody></tbody></table>`;
@@ -261,11 +255,8 @@
             order: [[2, 'desc']],
             columns: [
                 { 
-                    data: null, 
-                    orderable: false, 
-                    render: (data, type, row) => {
-                        return row.status === 'Pendente' ? `<input type="checkbox" class="row-checkbox select-item" data-id="${row.id}">` : '';
-                    } 
+                    data: null, orderable: false, 
+                    render: (data, type, row) => (row.status === 'Pendente') ? `<input type="checkbox" class="row-checkbox select-item" data-id="${row.id}">` : ''
                 },
                 { data: 'convenio', render: d => `<small class="fw-bold">${d || ''}</small>` },
                 { data: 'competencia', render: d => `<span class="badge competencia-badge">${d || ''}</span>` },
@@ -280,108 +271,71 @@
             dom: 'f rtip'
         });
 
-        $('#selectAllRows').on('click', function() {
-            $('.select-item').prop('checked', this.checked);
-            updateBulkUI();
-        });
-
-        $('#tabelaLancamentos tbody').on('change', '.select-item', function() {
-            updateBulkUI();
-        });
-
+        $('#selectAllRows').on('click', function() { $('.select-item').prop('checked', this.checked); updateBulkUI(); });
+        $('#tabelaLancamentos tbody').on('change', '.select-item', function() { updateBulkUI(); });
         configurarFiltros();
     }
 
     function updateBulkUI() {
         const count = $('.select-item:checked').length;
-        if (count > 0) {
-            $('#bulkActions').fadeIn().css('display', 'flex');
-            $('#selectedCount').text(count);
-        } else {
-            $('#bulkActions').fadeOut();
-            $('#selectAllRows').prop('checked', false);
-        }
-    }
-
-    async function concluirSelecionados() {
-        const ids = $('.select-item:checked').map(function() { return $(this).data('id'); }).get();
-        const result = await Swal.fire({
-            title: 'Concluir convenios selecionados?',
-            text: `Deseja marcar os ${ids.length} itens selecionados como CONCLUÍDOS?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#198754',
-            confirmButtonText: 'Sim, concluir tudo!',
-            cancelButtonText: 'Cancelar'
-        });
-
-        if (result.isConfirmed) {
-            Swal.fire({ title: 'Sincronizando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-            for (const id of ids) {
-                const item = dadosAcumulados.find(d => String(d.id) === String(id));
-                if (item && item.status === 'Pendente') {
-                    item.status = 'Concluído';
-                    if (!String(id).includes('.')) {
-                        await supabaseClient.from('lancamentos').update({ status: 'Concluído' }).eq('id', id);
-                    }
-                }
-            }
-            exibirTabela(dadosAcumulados);
-            atualizarCards();
-            Swal.fire({ icon: 'success', title: 'Sucesso!', text: 'Itens atualizados.', timer: 2000, showConfirmButton: false });
-        }
+        if (count > 0) { $('#bulkActions').fadeIn().css('display', 'flex'); $('#selectedCount').text(count); }
+        else { $('#bulkActions').fadeOut(); $('#selectAllRows').prop('checked', false); }
     }
 
     async function toggleStatus(id) {
         const item = dadosAcumulados.find(d => String(d.id) === String(id));
         if (!item) return;
+        if (item.status === 'Concluído') return Swal.fire("Ação Bloqueada", "Para desfazer, contate o administrador.", "error");
 
-        if (item.status === 'Concluído') {
-            Swal.fire({
-                icon: 'error',
-                title: 'Ação Bloqueada',
-                text: 'Para desfazer, contate o administrador.',
-                confirmButtonColor: '#2c3e50'
-            });
-            return;
-        }
-
-        Swal.fire({
-            title: 'Confirmar Lançamento?',
-            text: `Deseja marcar "${item.convenio}" como CONCLUÍDO?`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: '#198754',
-            confirmButtonText: 'Sim, concluir!',
-            cancelButtonText: 'Cancelar'
-        }).then(async (result) => {
-            if (result.isConfirmed) {
-                item.status = 'Concluído';
-                exibirTabela(dadosAcumulados);
-                atualizarCards();
-                if (!String(id).includes('.')) {
-                    await supabaseClient.from('lancamentos').update({ status: 'Concluído' }).eq('id', id);
-                }
-                Swal.fire({ icon: 'success', title: 'Sucesso!', timer: 1500, showConfirmButton: false });
+        const result = await Swal.fire({ title: 'Concluir?', text: `Marcar "${item.convenio}" como CONCLUÍDO?`, icon: 'question', showCancelButton: true });
+        if (result.isConfirmed) {
+            item.status = 'Concluído';
+            exibirTabela(dadosAcumulados);
+            atualizarCards();
+            if (!String(id).startsWith('new_')) {
+                await supabaseClient.from('lancamentos').update({ status: 'Concluído' }).eq('id', id);
             }
-        });
+        }
+    }
+
+    async function concluirSelecionados() {
+        const ids = $('.select-item:checked').map(function() { return $(this).data('id'); }).get();
+        const result = await Swal.fire({ title: 'Ação em Massa', text: `Concluir ${ids.length} itens?`, icon: 'warning', showCancelButton: true });
+        if (result.isConfirmed) {
+            Swal.fire({ title: 'Sincronizando...', didOpen: () => Swal.showLoading() });
+            for (const id of ids) {
+                const item = dadosAcumulados.find(d => String(d.id) === String(id));
+                if (item && item.status === 'Pendente') {
+                    item.status = 'Concluído';
+                    if (!String(id).startsWith('new_')) await supabaseClient.from('lancamentos').update({ status: 'Concluído' }).eq('id', id);
+                }
+            }
+            exibirTabela(dadosAcumulados); atualizarCards();
+            Swal.fire("Sucesso!", "Itens atualizados.", "success");
+        }
+    }
+
+    async function enviarParaSupabase() {
+        const novos = dadosAcumulados.filter(item => String(item.id).startsWith('new_'));
+        if (novos.length === 0) return Swal.fire("Aviso", "Não há novos registros para sincronizar.", "info");
+
+        Swal.fire({ title: 'Sincronizando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+        for (const item of novos) {
+            const { data: exArray } = await supabaseClient.from('lancamentos').select('id').eq('convenio', item.convenio).eq('competencia', item.competencia).limit(1);
+            const payload = { ...item }; delete payload.id;
+            if (exArray && exArray.length > 0) await supabaseClient.from('lancamentos').update(payload).eq('id', exArray[0].id);
+            else await supabaseClient.from('lancamentos').insert(payload);
+        }
+        Swal.fire({ icon: 'success', title: 'Sincronizado!', timer: 1500, showConfirmButton: false });
+        setTimeout(() => location.reload(), 1600);
     }
 
     function exportarParaExcel() {
         const filtro = document.getElementById('filtroExportar').value;
-        let dadosFiltrados = [...dadosAcumulados];
-        if (filtro !== 'Todos') dadosFiltrados = dadosAcumulados.filter(d => d.status === filtro);
-        if (dadosFiltrados.length === 0) return alert("Nenhum dado!");
-
-        const dadosExcel = dadosFiltrados.map(d => ({
-            "Convênio": d.convenio, "Competência": d.competencia, "Responsável": d.responsavel, "Sistema": d.sistema,
-            "Corte": new Date(d.data_corte + 'T12:00:00').toLocaleDateString('pt-BR'), "Status": d.status
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(dadosExcel);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Relatório");
-        XLSX.writeFile(wb, `Relatorio_AKRK_${new Date().toLocaleDateString('pt-BR')}.xlsx`);
+        let dF = (filtro !== 'Todos') ? dadosAcumulados.filter(d => d.status === filtro) : [...dadosAcumulados];
+        const ws = XLSX.utils.json_to_sheet(dF.map(d => ({ "Convênio": d.convenio, "Competência": d.competencia, "Responsável": d.responsavel, "Corte": d.data_corte, "Status": d.status })));
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+        XLSX.writeFile(wb, `Relatorio_AKRK.xlsx`);
     }
 
     function gerarChecklistFiltros(dados) {
@@ -402,34 +356,6 @@
         });
     }
 
-    async function enviarParaSupabase() {
-        const novos = dadosAcumulados.filter(item => String(item.id).includes('.'));
-        if (novos.length === 0) return;
-
-        Swal.fire({ title: 'Sincronizando novos dados...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
-        for (const item of novos) {
-            const { data: exArray } = await supabaseClient
-                .from('lancamentos')
-                .select('id')
-                .eq('convenio', item.convenio)
-                .eq('competencia', item.competencia)
-                .limit(1);
-
-            const payload = { ...item }; 
-            delete payload.id;
-
-            if (exArray && exArray.length > 0) {
-                await supabaseClient.from('lancamentos').update(payload).eq('id', exArray[0].id);
-            } else {
-                await supabaseClient.from('lancamentos').insert(payload);
-            }
-        }
-        
-        Swal.fire({ icon: 'success', title: 'Sincronizado!', showConfirmButton: false, timer: 1500 });
-        setTimeout(() => location.reload(), 1600);
-    }
-
     function atualizarCards() {
         document.getElementById('countTotal').innerText = dadosAcumulados.length;
         document.getElementById('countPendente').innerText = dadosAcumulados.filter(d => d.status === 'Pendente').length;
@@ -437,7 +363,6 @@
     }
 
     function toggleAll(id) { $(`#${id} input`).each(function() { this.checked = !this.checked; }); table.draw(); }
-
     document.getElementById('dataAtual').innerText = new Date().toLocaleDateString('pt-BR');
     carregarDadosBanco();
 </script>
