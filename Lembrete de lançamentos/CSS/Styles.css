@@ -1,0 +1,447 @@
+/* ===================================================
+   Base do layout e tipografia
+   Define a aparência geral da página e a fonte padrão
+   =================================================== */
+body {
+    background: linear-gradient(180deg, #eef3f8 0%, #f7f9fc 100%);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #1f2937;
+}
+
+/* ===================================================
+   Cabeçalho / navegação
+   Estilo do topo da aplicação, botão de tema e destaque visual
+   =================================================== */
+.navbar {
+    background: linear-gradient(135deg, #12314d 0%, #183f63 38%, #204f7c 100%);
+    padding: 1.05rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 12px 30px rgba(16, 38, 63, 0.18);
+    position: relative;
+}
+
+.navbar::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 3px;
+    background: linear-gradient(90deg, rgba(122, 171, 255, 0.95), rgba(178, 214, 255, 0.8));
+}
+
+.theme-toggle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    box-shadow: none;
+}
+
+.theme-toggle:hover,
+.theme-toggle.active {
+    background: rgba(255,255,255,0.16);
+    border-color: rgba(255,255,255,0.35);
+    color: #fff;
+}
+
+/* ===================================================
+   Cartões e painéis
+   Estilo base dos cards usados em todo o painel da aplicação
+   =================================================== */
+.card {
+    border: 1px solid rgba(214, 224, 236, 0.9);
+    border-radius: 16px;
+    box-shadow: 0 10px 22px rgba(15, 35, 54, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 14px 26px rgba(15, 35, 54, 0.06);
+}
+
+/* Cards de resumo exibidos no topo da página */
+.card-resumo {
+    color: white;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ===================================================
+   Filtros e controles de pesquisa
+   Área lateral com filtros, botões e títulos de seção
+   =================================================== */
+.filter-section {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 14px;
+    margin-bottom: 20px;
+    border: 1px solid #e5edf5;
+    box-shadow: 0 6px 18px rgba(44, 62, 80, 0.04);
+}
+
+/* Título da seção de filtros, com opção de selecionar tudo */
+.filter-title {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.select-all-link {
+    font-size: 0.75rem;
+    text-decoration: none;
+    color: #3598db;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+/* Botão que indica o status de cada lançamento */
+.btn-status {
+    min-width: 120px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border-radius: 8px;
+}
+
+/* Transições suaves para inputs e botões */
+.form-control,
+.form-select,
+.btn {
+    transition: all 0.2s ease;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #9ab8e8;
+    box-shadow: 0 0 0 0.2rem rgba(72, 113, 196, 0.12);
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+/* ===================================================
+   Tabela de lançamentos
+   Define o container rolável, cabeçalho fixo e aparência da grid
+   =================================================== */
+#tabelaContainer {
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid #dde5ee;
+    border-radius: 10px;
+    padding: 10px;
+    background: #fff;
+}
+
+/* ===================================================
+   Mensagens e estados vazios
+   Exibe feedback visual quando não há registros para mostrar
+   =================================================== */
+
+#tabelaLancamentos thead {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: white;
+}
+
+#tabelaLancamentos th {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #495057;
+}
+
+/* ===================================================
+   Ações em massa selecionadas
+   Barra exibida quando o usuário marca vários registros para executar ação coletiva
+   =================================================== */
+.selected-actions {
+    display: none;
+    margin-bottom: 15px;
+    padding: 16px 18px;
+    border-radius: 12px;
+    animation: fadeIn 0.3s;
+    background: linear-gradient(180deg, #f8fafc 0%, #eef5ff 100%);
+    border: 1px solid #d7e2f3;
+    color: #1f2937;
+    min-height: 68px;
+    box-shadow: 0 8px 18px rgba(26, 52, 84, 0.04);
+}
+
+.selected-actions span {
+    font-size: 0.98rem;
+    font-weight: 500;
+}
+
+.selected-actions strong {
+    font-size: 1.05rem;
+}
+
+.selected-actions.is-visible {
+    display: flex;
+}
+
+.btn-refreshing {
+    pointer-events: none;
+    opacity: 0.8;
+}
+
+.btn-refreshing i {
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.empty-state {
+    margin-top: 12px;
+    padding: 18px 16px;
+    border: 1px dashed #c7d2fe;
+    border-radius: 10px;
+    background: #f8faff;
+    color: #475569;
+    text-align: center;
+    font-weight: 600;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* ===================================================
+   Histórico e exportação
+   Estilo do campo de mês usado para filtros e exportação de dados
+   =================================================== */
+.historico-date-wrap {
+    position: relative;
+    width: 100%;
+}
+
+.card.border-dark,
+.card.border-success {
+    border-width: 1px !important;
+}
+
+.historico-date-wrap input[type="month"] {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    background-color: #fff;
+    color: #2c3e50;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.92rem;
+}
+
+.historico-date-wrap input[type="month"]:focus {
+    outline: none;
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+.import-preview-modal {
+    border-radius: 22px !important;
+    padding: 0.8rem !important;
+    box-shadow: 0 24px 60px rgba(17, 24, 39, 0.18) !important;
+    border: 1px solid rgba(127, 143, 170, 0.18) !important;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%) !important;
+}
+
+.import-preview-title {
+    font-size: 2.2rem !important;
+    font-weight: 700 !important;
+    color: #1f2d3d !important;
+    letter-spacing: -0.04em !important;
+    margin: 0.5rem 0 1.25rem !important;
+}
+
+.import-preview-content {
+    font-size: 1.04rem !important;
+    color: #243447 !important;
+    line-height: 1.75 !important;
+}
+
+.import-preview-content p {
+    margin-bottom: 0.8rem !important;
+}
+
+.import-preview-content ul {
+    margin: 0;
+    padding-left: 1.4rem;
+}
+
+.import-preview-content li {
+    margin-bottom: 0.55rem;
+    line-height: 1.6;
+}
+
+.import-preview-content .text-muted {
+    color: #607085 !important;
+}
+
+.import-preview-confirm,
+.import-preview-cancel {
+    min-width: 148px !important;
+    min-height: 48px !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    font-size: 1.02rem !important;
+    padding: 0.8rem 1.3rem !important;
+    border: none !important;
+    transition: all 0.2s ease !important;
+}
+
+.import-preview-confirm {
+    background: linear-gradient(135deg, #6d72f1 0%, #5a62d6 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 12px 22px rgba(90, 98, 214, 0.22) !important;
+}
+
+.import-preview-confirm:hover {
+    transform: translateY(-1px) !important;
+    filter: brightness(1.06) !important;
+}
+
+.import-preview-cancel {
+    background: linear-gradient(135deg, #eef2f8 0%, #e1e8f2 100%) !important;
+    color: #243447 !important;
+    box-shadow: inset 0 0 0 1px rgba(101, 117, 137, 0.08) !important;
+}
+
+.import-preview-cancel:hover {
+    transform: translateY(-1px) !important;
+    background: linear-gradient(135deg, #edf3fa 0%, #dde7f3 100%) !important;
+}
+
+.swal2-icon.swal2-info {
+    border-color: #6dbff0 !important;
+    color: #3ea8e5 !important;
+    width: 88px !important;
+    height: 88px !important;
+    margin: 0 auto 1.2rem !important;
+}
+
+.swal2-icon.swal2-info .swal2-icon-content {
+    font-size: 3rem !important;
+    line-height: 1 !important;
+}
+
+.swal2-actions {
+    gap: 0.8rem !important;
+    margin-top: 1.5rem !important;
+}
+
+/* ===================================================
+   Responsividade
+   Ajustes específicos para telas menores, mantendo a usabilidade do painel
+   =================================================== */
+@media (max-width: 991.98px) {
+    #tabelaContainer {
+        max-height: 58vh;
+    }
+
+    .selected-actions {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .selected-actions .btn {
+        width: 100%;
+    }
+
+    .import-preview-modal {
+        width: 94% !important;
+    }
+
+    .import-preview-title {
+        font-size: 1.6rem !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .container-fluid.px-4 {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .navbar .container-fluid {
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .navbar-brand {
+        font-size: 1rem;
+        white-space: nowrap;
+    }
+
+    .card-resumo {
+        margin-bottom: 12px;
+        padding: 16px;
+    }
+
+    .filter-section,
+    .card.p-3,
+    .card.p-4 {
+        padding: 14px !important;
+    }
+
+    #tabelaContainer {
+        max-height: 50vh;
+    }
+
+    .selected-actions {
+        padding: 14px 15px;
+    }
+}
+
+@media (max-width: 576px) {
+    .historico-date-wrap input[type="month"] {
+        min-height: 42px;
+        font-size: 0.85rem;
+    }
+
+    .selected-actions {
+        display: none;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 12px 14px;
+        min-height: auto;
+    }
+
+    .selected-actions.is-visible {
+        display: flex;
+    }
+
+    .selected-actions .btn {
+        width: 100%;
+    }
+
+    .btn-status {
+        min-width: 100%;
+    }
+}

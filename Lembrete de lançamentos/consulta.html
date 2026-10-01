@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <!--
+        ---------------------------------------------------------------------
+        CABEÇALHO E ESTILOS
+        ---------------------------------------------------------------------
+    -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histórico de Datas de Corte</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #1f3a5f;
+            --primary-soft: #eaf3ff;
+            --accent-color: #2f80ed;
+            --success-color: #1ea66a;
+            --success-soft: #e8faf2;
+            --bg-body: #eef4fb;
+            --card-bg: #ffffff;
+            --text-primary: #1f2937;
+            --text-muted: #64748b;
+            --border-soft: #dfeaf5;
+            --shadow-soft: 0 15px 35px rgba(31, 58, 95, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(180deg, #f2f7ff 0%, var(--bg-body) 100%);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, #10263f 0%, #183a5a 30%, #1d4d73 100%);
+            padding: 1.1rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 12px 30px rgba(16, 38, 63, 0.18);
+            position: relative;
+        }
+
+        .navbar::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -1px;
+            height: 3px;
+            background: linear-gradient(90deg, #7cc6ff 0%, #4ea5ff 35%, #9be7b5 100%);
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+        }
+
+        .navbar-brand p {
+            margin: 0;
+            font-size: clamp(1rem, 2vw, 1.38rem);
+            font-weight: 800;
+            letter-spacing: 0.02em;
+            color: #f3f8ff;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .main-card {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(223, 234, 245, 0.8);
+            border-radius: 22px;
+            box-shadow: 0 22px 45px rgba(15, 35, 54, 0.07);
+            margin-bottom: 2rem;
+            padding: clamp(1.25rem, 3vw, 2.5rem);
+            backdrop-filter: blur(2px);
+        }
+
+        .section-title {
+            position: relative;
+            font-weight: 800;
+            color: var(--primary-color);
+            padding-left: 1rem;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        .section-title::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0.2rem;
+            bottom: 0.2rem;
+            width: 5px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, var(--accent-color) 0%, #7bc5ff 100%);
+        }
+
+        .lead-text {
+            color: var(--text-muted);
+            font-size: 0.97rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-control-lg,
+        .btn-download,
+        .input-group {
+            transition: all 0.2s ease;
+        }
+
+        .form-control-lg {
+            border-radius: 14px;
+            border: 1.5px solid var(--border-soft);
+            font-size: 1rem;
+            padding: 0.9rem 1rem;
+            background: #fff;
+            color: var(--text-primary);
+            box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+        }
+
+        .form-control-lg:focus {
+            border-color: rgba(47, 128, 237, 0.75);
+            box-shadow: 0 0 0 0.25rem rgba(47, 128, 237, 0.12);
+            outline: none;
+        }
+
+        .btn-download {
+            background: linear-gradient(135deg, var(--success-color) 0%, #24b27d 100%);
+            border: none;
+            border-radius: 14px;
+            padding: 0.9rem 1.1rem;
+            font-weight: 700;
+            color: #fff;
+            box-shadow: 0 10px 18px rgba(30, 166, 106, 0.25);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-download::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.18) 30%, transparent 60%);
+            transform: translateX(-100%);
+            transition: transform 0.5s ease;
+        }
+
+        .btn-download:hover::before {
+            transform: translateX(100%);
+        }
+
+        .btn-download:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 22px rgba(30, 166, 106, 0.32);
+        }
+
+        .table-responsive {
+            max-height: 450px;
+            overflow-y: auto;
+            display: block;
+            border: 1px solid rgba(203, 216, 232, 0.9);
+            border-radius: 18px;
+            background: #fff;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+        }
+
+        .table {
+            margin-bottom: 0;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .table thead th {
+            position: sticky;
+            top: 0;
+            background: linear-gradient(180deg, #f7faff 0%, #edf3fb 100%) !important;
+            z-index: 10;
+            box-shadow: inset 0 -1px 0 rgba(203, 216, 232, 0.9);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #52657a;
+            padding: 0.95rem 1rem;
+        }
+
+        .table tbody td {
+            padding: 1rem;
+            vertical-align: middle;
+            font-size: 0.94rem;
+            color: var(--text-primary);
+            border-bottom: 1px solid rgba(223, 234, 245, 0.8);
+        }
+
+        .table tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        .table tbody tr:hover {
+            background: linear-gradient(90deg, rgba(234, 243, 255, 0.7) 0%, rgba(255,255,255,0.9) 100%);
+        }
+
+        .table tbody tr:nth-child(even) {
+            background-color: rgba(248, 250, 252, 0.9);
+        }
+
+        .badge-comp {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 90px;
+            background: var(--primary-soft);
+            color: var(--primary-color);
+            font-weight: 700;
+            padding: 0.42rem 0.8rem;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            letter-spacing: 0.02em;
+        }
+
+        .search-bar {
+            max-width: 360px;
+            width: 100%;
+            border-radius: 12px;
+            border: 1.5px solid var(--border-soft);
+            background: #fff;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(31, 58, 95, 0.03);
+        }
+
+        .search-bar:focus-within {
+            border-color: rgba(47, 128, 237, 0.8);
+            box-shadow: 0 0 0 0.25rem rgba(47, 128, 237, 0.12);
+        }
+
+        .search-bar .input-group-text {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding-left: 0.9rem;
+        }
+
+        .search-bar .form-control {
+            border: none;
+            box-shadow: none;
+            background: transparent;
+            padding: 0.8rem 0.9rem 0.8rem 0.2rem;
+            font-size: 0.95rem;
+        }
+
+        .search-bar .form-control:focus {
+            box-shadow: none;
+        }
+
+        #placeholder-vazio {
+            background: linear-gradient(180deg, #f9fbff 0%, #eef6ff 100%);
+            border: 1px dashed #cfe0f8;
+            border-radius: 18px;
+            padding: 3rem 1rem;
+            color: var(--text-muted);
+        }
+
+        #placeholder-vazio i {
+            color: #b9d3f7;
+            margin-bottom: 1rem;
+        }
+
+        #placeholder-vazio p {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        @media (max-width: 991.98px) {
+            .main-card {
+                padding: 1.5rem;
+            }
+
+            .search-bar {
+                max-width: 100%;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .navbar {
+                padding: 0.9rem 0;
+            }
+
+            .navbar-brand p {
+                font-size: 1.05rem;
+            }
+
+            .section-title {
+                font-size: 1.3rem;
+            }
+
+            .main-card {
+                border-radius: 16px;
+                padding: 1.2rem;
+            }
+
+            .d-flex.flex-column.flex-md-row {
+                align-items: stretch !important;
+            }
+
+            .btn-download {
+                width: 100%;
+            }
+
+            .navbar-brand p {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .container {
+                padding-left: 0.8rem;
+                padding-right: 0.8rem;
+            }
+
+            .navbar .container {
+                gap: 0.7rem;
+                align-items: center;
+            }
+
+            .navbar-brand {
+                width: 100%;
+            }
+
+            .table-responsive {
+                max-height: 360px;
+            }
+
+            .table tbody td {
+                font-size: 0.85rem;
+                padding: 0.8rem 0.7rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!--
+        ---------------------------------------------------------------------
+        TOPO DA PÁGINA
+        ---------------------------------------------------------------------
+    -->
+    <nav class="navbar navbar-dark mb-5">
+        <div class="container d-flex justify-content-between align-items-center gap-3">
+            <a class="navbar-brand fw-bold" href="#" aria-label="Consulta de Datas de Corte">
+                <p class="mb-0">Consulta de Datas de Corte</p>
+            </a>
+            <div class="text-white text-end px-2 py-1 rounded-3" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.08);">
+                <small class="d-block opacity-75">Data de Hoje</small>
+                <strong><span id="dataAtual">--/--/----</span></strong>
+            </div>
+        </div>
+    </nav>
+
+    <!--
+        ---------------------------------------------------------------------
+        CONTAINER PRINCIPAL
+        ---------------------------------------------------------------------
+    -->
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-xl-10">
+                <div class="main-card p-4 p-md-5">
+                    <h3 class="section-title">Histórico de Datas de Corte</h3>
+                    <p class="lead-text">Selecione uma competência para visualizar os dados e realizar a exportação em Excel.</p>
+
+                    <!-- Seleção de competência e botão de exportação -->
+                    <div class="row g-3 align-items-end mb-5">
+                        <div class="col-md-7">
+                            <label class="form-label small fw-bold text-secondary">Competência de Referência</label>
+                            <input type="month" id="select-historico-comp" class="form-control form-control-lg">
+                        </div>
+                        <div class="col-md-5">
+                            <button id="btnExportarHistorico" class="btn btn-download w-100 shadow-sm" type="button">
+                                <i class="fas fa-file-excel me-2"></i> Baixar Relatório Completo
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Área da tabela e do filtro de pesquisa -->
+                    <div id="wrapper-tabela" style="display: none;">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-3">
+                            <h6 class="fw-bold mb-0"><i class="fas fa-list me-2"></i>Prévia dos Dados</h6>
+
+                            <div class="input-group search-bar" style="max-width: 350px;">
+                                <span class="input-group-text bg-white border-0"><i class="fas fa-search text-muted"></i></span>
+                                <input type="text" id="input-pesquisa" class="form-control border-0 shadow-none ps-0" placeholder="Buscar convênio...">
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="tabelaDados">
+                                <thead>
+                                    <tr>
+                                        <th>Convênio</th>
+                                        <th class="text-center">Lançamento</th>
+                                        <th class="text-center">Data de Corte</th>
+                                        <th class="text-center">Competência</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="corpo-tabela"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Estado vazio antes da seleção -->
+                    <div id="placeholder-vazio" class="text-center py-5">
+                        <i class="fas fa-search fa-3x mb-3"></i>
+                        <p>Aguardando seleção de competência para exibir resultados.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!--
+        ---------------------------------------------------------------------
+        BIBLIOTECAS E LÓGICA DE CONSULTA
+        ---------------------------------------------------------------------
+    -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <script>
+        const _URL = 'https://yqfswykeybzaaysoygjd.supabase.co';
+        const _KEY = 'sb_publishable_d8gxS1nSdVtwxHgcmmxT1g_Jarm23Nj';
+        const supabaseClient = supabase.createClient(_URL, _KEY);
+
+        const elementos = {
+            dataAtual: document.getElementById('dataAtual'),
+            selectCompetencia: document.getElementById('select-historico-comp'),
+            inputPesquisa: document.getElementById('input-pesquisa'),
+            btnExportar: document.getElementById('btnExportarHistorico'),
+            tabelaWrapper: document.getElementById('wrapper-tabela'),
+            placeholder: document.getElementById('placeholder-vazio'),
+            corpoTabela: document.getElementById('corpo-tabela')
+        };
+
+        let dadosCache = [];
+
+        // ---------------------------------------------------------------------
+        // FUNÇÕES AUXILIARES
+        // ---------------------------------------------------------------------
+        function formatarDataBR(valor) {
+            if (!valor) return '-';
+            return valor.split('-').reverse().join('/');
+        }
+
+        function exibirEstadoVazio() {
+            elementos.tabelaWrapper.style.display = 'none';
+            elementos.placeholder.style.display = 'block';
+        }
+
+        function exibirTabela() {
+            elementos.placeholder.style.display = 'none';
+            elementos.tabelaWrapper.style.display = 'block';
+        }
+
+        function renderizarTabela(dados) {
+            if (!dados || dados.length === 0) {
+                elementos.corpoTabela.innerHTML = '<tr><td colspan="4" class="text-center text-danger py-4">Nenhum registro encontrado.</td></tr>';
+                return;
+            }
+
+            const html = dados.map(item => `
+                <tr>
+                    <td><strong class="text-uppercase">${item.convenio}</strong></td>
+                    <td class="text-center text-secondary">${formatarDataBR(item.data_lancamento)}</td>
+                    <td class="text-center fw-bold text-danger">${formatarDataBR(item.data_corte)}</td>
+                    <td class="text-center"><span class="badge-comp">${item.competencia}</span></td>
+                </tr>
+            `).join('');
+
+            elementos.corpoTabela.innerHTML = html;
+        }
+
+        function filtrarTabela() {
+            const termoBusca = elementos.inputPesquisa.value.trim().toLowerCase();
+
+            if (!termoBusca) {
+                renderizarTabela(dadosCache);
+                return;
+            }
+
+            const dadosFiltrados = dadosCache.filter(item =>
+                item.convenio.toLowerCase().includes(termoBusca)
+            );
+
+            renderizarTabela(dadosFiltrados);
+        }
+
+        // ---------------------------------------------------------------------
+        // CONSULTA DO HISTÓRICO
+        // ---------------------------------------------------------------------
+        async function carregarDadosVisualizacao() {
+            const valorInput = elementos.selectCompetencia.value;
+
+            if (!valorInput) {
+                dadosCache = [];
+                renderizarTabela([]);
+                exibirEstadoVazio();
+                return;
+            }
+
+            elementos.inputPesquisa.value = '';
+
+            const [ano, mes] = valorInput.split('-');
+            const competencia = `${mes}/${ano}`;
+
+            exibirTabela();
+
+            const { data, error } = await supabaseClient
+                .from('historico_datas_corte')
+                .select('*')
+                .eq('competencia', competencia)
+                .order('convenio', { ascending: true });
+
+            if (error || !data || data.length === 0) {
+                dadosCache = [];
+                renderizarTabela([]);
+                return;
+            }
+
+            dadosCache = data;
+            renderizarTabela(dadosCache);
+        }
+
+        function exportarHistoricoCortes() {
+            const valorInput = elementos.selectCompetencia.value;
+
+            if (!valorInput || dadosCache.length === 0) {
+                return Swal.fire('Aviso', 'Selecione uma competência com dados disponíveis.', 'warning');
+            }
+
+            const [ano, mes] = valorInput.split('-');
+            const compNomeArquivo = `${mes}-${ano}`;
+
+            const dadosExcel = dadosCache.map(item => ({
+                'Convênio': item.convenio.toUpperCase(),
+                'Data de Lançamento': formatarDataBR(item.data_lancamento),
+                'Data de Corte': formatarDataBR(item.data_corte),
+                'Competência': item.competencia
+            }));
+
+            const planilha = XLSX.utils.json_to_sheet(dadosExcel);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, planilha, 'Histórico');
+            XLSX.writeFile(workbook, `Datas de corte competência ${compNomeArquivo}.xlsx`);
+        }
+
+        // ---------------------------------------------------------------------
+        // MONITORAMENTO E INICIALIZAÇÃO
+        // ---------------------------------------------------------------------
+        function configurarRealtime() {
+            supabaseClient
+                .channel('realtime_historico')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'historico_datas_corte' },
+                    () => {
+                        if (elementos.selectCompetencia.value) {
+                            carregarDadosVisualizacao();
+                        }
+                    }
+                )
+                .subscribe();
+
+            setInterval(() => {
+                if (elementos.selectCompetencia.value) {
+                    carregarDadosVisualizacao();
+                }
+            }, 30000);
+        }
+
+        function inicializarEventos() {
+            elementos.selectCompetencia.addEventListener('change', carregarDadosVisualizacao);
+            elementos.inputPesquisa.addEventListener('input', filtrarTabela);
+            elementos.btnExportar.addEventListener('click', exportarHistoricoCortes);
+        }
+
+        function inicializarPagina() {
+            const hoje = new Date();
+            const mesAtual = hoje.toISOString().slice(0, 7);
+
+            elementos.dataAtual.textContent = hoje.toLocaleDateString('pt-BR');
+            elementos.selectCompetencia.value = mesAtual;
+
+            inicializarEventos();
+            configurarRealtime();
+            carregarDadosVisualizacao();
+        }
+
+        document.addEventListener('DOMContentLoaded', inicializarPagina);
+    </script>
+</body>
+</html>
